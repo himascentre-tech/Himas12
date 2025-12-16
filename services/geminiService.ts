@@ -1,6 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { Patient } from "../types";
 
+// Declare process to satisfy TypeScript since we don't have @types/node
+declare const process: {
+  env: {
+    API_KEY: string;
+  }
+};
+
 // Note: In a real production app, this key should be secure. 
 // For this demo, we assume the environment variable or user input is handled.
 const getClient = () => {
