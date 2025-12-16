@@ -20,62 +20,28 @@ interface HospitalContextType {
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
-// Storage Keys
-const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
+// Storage Keys - Session only
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
+// Note: We deliberately do NOT use a local storage key for patients when online 
+// to ensure Supabase is the single source of truth.
 
-// SHARED DATABASE KEY
+// SHARED DATABASE KEY - This ensures all roles see the SAME data
 const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
-// Seed Data (Only for Offline Demo)
-const SEED_PATIENTS: Patient[] = [
-  {
-    id: 'REG-1001',
-    name: 'Sarah Jenkins',
-    dob: '1979-05-15',
-    gender: Gender.Female,
-    age: 45,
-    mobile: '555-0123',
-    occupation: 'Teacher',
-    hasInsurance: 'Yes',
-    insuranceName: 'Aetna Health',
-    source: 'Google',
-    condition: Condition.Hernia,
-    registeredAt: new Date(Date.now() - 86400000).toISOString(),
-  }
-];
-
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // 1. Initialize Role
+  // 1. Initialize Role from LocalStorage (Session Persistence)
   const [currentUserRole, setCurrentUserRole] = useState<Role>(() => {
     return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
   });
 
+  // State Management
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false); // Safety Lock
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // 2. Initialize Patients
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    // If Supabase is connected, start EMPTY to avoid "Seed Data Overwrite" bug.
-    // We trust loadData() to fetch the real list.
-    if (isSupabaseConfigured) return [];
-    
-    // Only use LocalStorage/Seed if strictly offline/demo mode
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed : SEED_PATIENTS;
-      }
-      return SEED_PATIENTS;
-    } catch {
-      return SEED_PATIENTS;
-    }
-  });
-
-  // 3. Persist Role
+  // 2. Effect: Persist Role Changes
   useEffect(() => {
     if (currentUserRole) {
       localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
@@ -83,20 +49,24 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     } else {
       localStorage.removeItem(STORAGE_KEY_ROLE);
       localStorage.removeItem('role');
+      setPatients([]); // Clear data on logout
+      setIsDataLoaded(false);
     }
   }, [currentUserRole]);
 
-  // Function to load data from Cloud
+  // 3. Function to load data from Cloud
   const loadData = async () => {
+    // Only load if logged in
     const role = localStorage.getItem("role") || currentUserRole;
     if (!role) return;
 
     if (isSupabaseConfigured) {
-      console.log("SYNC: Starting Cloud Sync...");
-      setIsLoading(true); // Lock the UI
+      console.log("SYNC: Fetching from Cloud...");
+      setIsLoading(true); 
       setSaveStatus('saving');
 
       try {
+        // Fetch the shared master record
         const { data, error } = await supabase
           .from("app_data")
           .select("data")
@@ -106,63 +76,75 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (error) {
           console.error("Supabase Load Error:", error.message);
           setSaveStatus('error');
-          // Important: We do NOT unlock saving (isDataLoaded) if sync failed
-          // This prevents overwriting cloud with local empty state
+          // Do NOT enable saving if load failed to prevent data overwrite
         } else if (data?.data) {
-          console.log("✅ SYNC: Cloud Data Received");
+          console.log(`✅ SYNC: Loaded ${Array.isArray(data.data) ? data.data.length : 0} records.`);
           setPatients(data.data as Patient[]);
-          localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(data.data));
           setSaveStatus('saved');
           setLastSavedAt(new Date());
-          setIsDataLoaded(true); // Allow future saves
+          setIsDataLoaded(true); // Enable saving
         } else {
-          console.log("SYNC: No Cloud Data (New Database)");
-          // Database is empty, safe to initialize with empty list (or keep current if we want)
-          setIsDataLoaded(true); // Allow saving
-          setSaveStatus('saved');
+          console.log("SYNC: No Cloud Data found. Creating master record.");
+          // IMPORTANT: If row doesn't exist, we MUST create it so UPDATE works later.
+          // This self-heals the DB if the manual SQL wasn't run.
+          const { error: insertError } = await supabase
+            .from("app_data")
+            .insert({
+              role: SHARED_DB_KEY,
+              data: [],
+              updated_at: new Date().toISOString()
+            });
+
+          if (insertError) {
+             console.error("SYNC: Failed to create master record", insertError);
+             setSaveStatus('error');
+          } else {
+             setPatients([]); 
+             setIsDataLoaded(true); // Enable saving for new data
+             setSaveStatus('saved');
+          }
         }
       } catch (e) {
-        console.error("SYNC: Network Error", e);
+        console.error("SYNC: Network Exception", e);
         setSaveStatus('error');
       } finally {
-        setIsLoading(false); // Unlock UI
+        setIsLoading(false); 
       }
     } else {
-      // Offline Mode
+      // Offline/Demo Mode (Fallback)
+      console.log("SYNC: Offline Mode");
       setIsDataLoaded(true);
       setIsLoading(false);
     }
   };
 
-  // 4. Load Data on Login
+  // 4. Load Data on Mount/Login
   useEffect(() => {
     if (currentUserRole) {
       loadData();
     }
   }, [currentUserRole]);
 
-  // 5. Save Data (Only if loaded)
+  // 5. Save Data (Only if loaded successfully)
   useEffect(() => {
-    if (!isDataLoaded) return; // STRICT CHECK: Never save if we haven't successfully loaded first
+    if (!isDataLoaded) return; // STRICT CHECK: Never save if initial load failed or is pending
 
-    // A. Local Backup
-    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
-
-    // B. Cloud Save
     const saveData = async () => {
-      const role = localStorage.getItem("role") || currentUserRole;
-      if (!role || !isSupabaseConfigured) return;
+      if (!currentUserRole || !isSupabaseConfigured) return;
 
       setSaveStatus('saving');
+      console.log("Saving to Supabase", patients); // Debug log
       
       try {
+        // ✅ CORRECTED LOGIC: Use UPDATE instead of UPSERT
+        // This ensures we only update the existing master row and don't create duplicates
         const { error } = await supabase
           .from("app_data")
-          .upsert({
-            role: SHARED_DB_KEY,
+          .update({
             data: patients,
             updated_at: new Date().toISOString()
-          }, { onConflict: 'role' });
+          })
+          .eq("role", SHARED_DB_KEY); // Identifies the specific row to update
 
         if (error) {
           console.error("Supabase Save Error:", error.message);
@@ -177,22 +159,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     };
 
-    // Debounce slightly to prevent thrashing
-    const timeout = setTimeout(saveData, 500);
+    // Debounce saves to reduce API calls
+    const timeout = setTimeout(saveData, 1000);
     return () => clearTimeout(timeout);
 
   }, [patients, isDataLoaded, currentUserRole]);
-
-  // 6. Cross-tab Sync
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
-        setPatients(JSON.parse(e.newValue));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   // Actions
   const addPatient = (patientData: Omit<Patient, 'registeredAt'>) => {

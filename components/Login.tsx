@@ -8,38 +8,39 @@ export const Login: React.FC = () => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoggingIn(true);
+
+    // Simulate network delay for UX
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     let role: Role = null;
 
-    // CREDENTIALS CHECK
-    // 1. Front Office
-    if (userId === "Himasoffice" && password === "Himas1984@") {
+    // CREDENTIALS CHECK (Exact Match Required)
+    if (userId.trim() === "Himasoffice" && password.trim() === "Himas1984@") {
       role = "FRONT_OFFICE";
     } 
-    // 2. Doctor
-    else if (userId === "DoctorHimas" && password === "Doctor8419@") {
+    else if (userId.trim() === "DoctorHimas" && password.trim() === "Doctor8419@") {
       role = "DOCTOR";
     } 
-    // 3. Package Team
-    else if (userId === "Team1984" && password === "Team8131@") {
+    else if (userId.trim() === "Team1984" && password.trim() === "Team8131@") {
       role = "PACKAGE_TEAM";
     }
     
     if (role) {
-      // 1. Update Context
-      setCurrentUserRole(role);
-      
-      // 2. Persist Session
+      console.log(`Login Successful: ${role}`);
+      // 1. Persist Session
       localStorage.setItem("role", role);
       localStorage.setItem("username", userId);
-      
-      console.log(`Login Successful: ${role}`);
+      // 2. Update Context (Triggers Cloud Fetch)
+      setCurrentUserRole(role);
     } else {
       setError('Invalid User ID or Password. Please try again.');
+      setIsLoggingIn(false);
     }
   };
 
@@ -102,10 +103,15 @@ export const Login: React.FC = () => {
 
           <button 
             type="submit" 
-            className="w-full bg-hospital-600 text-white py-3 rounded-xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-200 transition-all flex items-center justify-center gap-2"
+            disabled={isLoggingIn}
+            className="w-full bg-hospital-600 text-white py-3 rounded-xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <Key className="w-4 h-4" />
-            Secure Login
+            {isLoggingIn ? 'Verifying...' : (
+              <>
+                <Key className="w-4 h-4" />
+                Secure Login
+              </>
+            )}
           </button>
         </form>
       </div>

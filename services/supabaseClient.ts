@@ -7,22 +7,25 @@ declare const process: {
   }
 };
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+// Use environment variable first, fall back to the provided URL for convenience
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://xggnswfyegchwlplzvto.supabase.co";
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
+// Check if we have a key (URL is now guaranteed via fallback)
 export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
 
 let client;
 
 if (isSupabaseConfigured) {
   try {
-    client = createClient(SUPABASE_URL, SUPABASE_KEY);
+    client = createClient(SUPABASE_URL, SUPABASE_KEY!);
+    console.log("Supabase Client Initialized");
   } catch (error) {
-    console.warn("Supabase client init failed:", error);
+    console.error("Supabase client init failed:", error);
     client = createMockClient();
   }
 } else {
-  console.warn("Supabase credentials missing. Using offline mock.");
+  console.warn("Supabase credentials missing. App running in Offline/Demo mode.");
   client = createMockClient();
 }
 
