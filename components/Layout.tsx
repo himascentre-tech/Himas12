@@ -1,10 +1,16 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, PlusSquare, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserRole, setCurrentUserRole, saveStatus, lastSavedAt } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem("role");
+    localStorage.removeItem("username");
+    setCurrentUserRole(null);
+  };
 
   const getRoleLabel = () => {
     switch (currentUserRole) {
@@ -58,20 +64,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     );
   };
 
-  // Logo URL - Replace this with your actual logo path
-  const LOGO_URL_DARK = "https://placehold.co/400x120/0f172a/ffffff?text=HiMAS"; // For Dark Sidebar
-  const LOGO_URL_LIGHT = "https://placehold.co/400x120/ffffff/0284c7?text=HiMAS"; // For Light Mobile Header
+  const LOGO_URL_DARK = "https://placehold.co/400x120/0f172a/ffffff?text=HiMAS"; 
+  const LOGO_URL_LIGHT = "https://placehold.co/400x120/ffffff/0284c7?text=HiMAS"; 
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
       <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
         <div className="flex items-center gap-2">
-           <img 
-             src={LOGO_URL_LIGHT} 
-             alt="Himas Hospital" 
-             className="h-8 w-auto"
-           />
+           <img src={LOGO_URL_LIGHT} alt="Himas Hospital" className="h-8 w-auto"/>
         </div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           {isSidebarOpen ? <X /> : <Menu />}
@@ -86,11 +87,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       `}>
         <div className="p-6">
           <div className="mb-8 px-2">
-            <img 
-              src={LOGO_URL_DARK} 
-              alt="Himas Hospital" 
-              className="h-12 w-auto"
-            />
+            <img src={LOGO_URL_DARK} alt="Himas Hospital" className="h-12 w-auto"/>
             <div className="text-[0.6rem] text-slate-400 mt-1 uppercase tracking-widest font-semibold">
               21st Century Surgical Hospital
             </div>
@@ -119,7 +116,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
         <div className="absolute bottom-0 w-full p-6 border-t border-slate-800">
           <button 
-            onClick={() => setCurrentUserRole(null)}
+            onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
           >
             <LogOut className="w-5 h-5" />
@@ -135,7 +132,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </main>
       
-      {/* Overlay for mobile sidebar */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-0 md:hidden"

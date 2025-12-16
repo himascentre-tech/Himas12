@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { User, Activity, Briefcase, Lock, Key } from 'lucide-react';
+import { User, Lock, Key } from 'lucide-react';
 import { Role } from '../types';
 
 export const Login: React.FC = () => {
@@ -13,27 +13,26 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    // Credentials Logic
-    // Front Office: Himasoffice / Himas1984@
-    // Doctor: DoctorHimas / Doctor8419@
-    // Package Team: Team1984 / Team8131@
-
     let role: Role = null;
 
-    if (userId === 'Himasoffice' && password === 'Himas1984@') {
-      role = 'FRONT_OFFICE';
-    } else if (userId === 'DoctorHimas' && password === 'Doctor8419@') {
-      role = 'DOCTOR';
-    } else if (userId === 'Team1984' && password === 'Team8131@') {
-      role = 'PACKAGE_TEAM';
+    // Credentials Logic as per requirements
+    if (userId === "Himasoffice" && password === "Himas1984@") {
+      role = "FRONT_OFFICE";
+    } else if (userId === "DoctorHimas" && password === "Doctor8419@") {
+      role = "DOCTOR";
+    } else if (userId === "Team1984" && password === "Team8131@") {
+      role = "PACKAGE_TEAM";
     }
     
     if (role) {
-      // 1. Update Context (which handles the app state)
+      // 1. Update Context
       setCurrentUserRole(role);
-      // 2. Explicitly set 'role' in localStorage as per requirement check
-      localStorage.setItem('role', role);
-      console.log("Logged in as:", role);
+      
+      // 2. Store specific keys as requested
+      localStorage.setItem("role", role);
+      localStorage.setItem("username", userId);
+      
+      console.log("Logged in successfully:", role);
     } else {
       setError('Invalid User ID or Password');
     }
@@ -69,7 +68,7 @@ export const Login: React.FC = () => {
                 value={userId}
                 onChange={e => setUserId(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500 outline-none transition-all"
-                placeholder="Enter your User ID"
+                placeholder="Enter User ID"
                 autoFocus
               />
             </div>

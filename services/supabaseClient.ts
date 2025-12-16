@@ -7,9 +7,6 @@ declare const process: {
   }
 };
 
-// NOTE: Ensure these variables are set in your .env file
-// VITE_SUPABASE_URL=https://your-project.supabase.co
-// VITE_SUPABASE_ANON_KEY=your-anon-key
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
@@ -19,11 +16,11 @@ if (SUPABASE_URL && SUPABASE_KEY) {
   try {
     client = createClient(SUPABASE_URL, SUPABASE_KEY);
   } catch (error) {
-    console.error("Failed to initialize Supabase client:", error);
+    console.warn("Supabase client init failed:", error);
     client = createMockClient();
   }
 } else {
-  console.warn("⚠️ Supabase Credentials not found. App running in offline mode.");
+  console.warn("Supabase credentials missing. Using offline mock.");
   client = createMockClient();
 }
 
@@ -32,10 +29,12 @@ function createMockClient() {
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+          single: async () => ({ data: null, error: { message: 'Offline mode' } }),
         }),
       }),
-      upsert: async () => ({ error: { message: 'Supabase not configured' } }),
+      upsert: async () => ({ error: null }),
+      insert: async () => ({ select: async () => ({ data: null, error: null }) }),
+      update: async () => ({ eq: () => ({ select: async () => ({ data: null, error: null }) }) }),
     }),
   } as any;
 }

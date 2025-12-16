@@ -22,9 +22,10 @@ const HospitalContext = createContext<HospitalContextType | undefined>(undefined
 const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
 
-// We use a shared key so Front Office, Doctor, and Package Team all see the SAME data.
-// This simulates a shared database environment.
-const SUPABASE_DB_KEY = 'HIMAS_MASTER_DATA'; 
+// SHARED DATABASE KEY
+// We use a constant key for the 'role' column in Supabase so that
+// Front Office, Doctor, and Package Team all share the SAME patient list.
+const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
 // Seed Data
 const SEED_PATIENTS: Patient[] = [
@@ -63,12 +64,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
   });
 
-  // Flag to prevent overwriting cloud data with empty local state on initial load
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Initialize Patients State with Local Storage fallback
+  // Initialize Patients State
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
@@ -83,119 +83,107 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (currentUserRole) {
       localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
-      // Also set the generic 'role' key as requested for compatibility/debugging
-      localStorage.setItem('role', currentUserRole);
+      localStorage.setItem('role', currentUserRole); // Compatibility with user prompt
     } else {
       localStorage.removeItem(STORAGE_KEY_ROLE);
       localStorage.removeItem('role');
     }
   }, [currentUserRole]);
 
-  // --- SUPABASE INTEGRATION ---
-
-  // 1. LOAD DATA ON MOUNT OR LOGIN
+  // --- SUPABASE LOAD LOGIC ---
   useEffect(() => {
     const loadData = async () => {
-      // Check if role exists as per requirements
-      const role = localStorage.getItem('role');
+      // 1. Verify Role exists in LocalStorage
+      const role = localStorage.getItem("role");
       if (!role) {
-        setSaveStatus('unsaved');
-        return; 
+        console.warn("No role found in localStorage. Skipping load.");
+        return;
       }
 
+      console.log("LOADING DATA FOR USER ROLE:", role);
+      setSaveStatus('saving');
+
       try {
-        setSaveStatus('saving'); // Indicate loading
-        // Attempt to fetch from Supabase
-        // We use a shared key (SUPABASE_DB_KEY) to ensure all roles share the same patient data
+        // 2. Fetch data from Supabase using the SHARED key
         const { data, error } = await supabase
-          .from('app_data')
-          .select('data')
-          .eq('role', SUPABASE_DB_KEY)
+          .from("app_data")
+          .select("data")
+          .eq("role", SHARED_DB_KEY) // We query the shared data
           .single();
 
-        if (data?.data) {
-          console.log('✅ Loaded data from Supabase');
+        if (error) {
+          console.warn("Supabase Load Error (or no data yet):", error.message);
+          setSaveStatus('unsaved');
+        } else if (data?.data) {
+          console.log("✅ Loaded data from Supabase");
           setPatients(data.data as Patient[]);
           setSaveStatus('saved');
           setLastSavedAt(new Date());
-        } else if (error) {
-          console.warn('Supabase fetch error (using local data):', error.message);
-          setSaveStatus('unsaved');
         }
       } catch (e) {
-        console.error('Supabase connection failed, using offline data.');
+        console.error("Connection failed:", e);
         setSaveStatus('unsaved');
       } finally {
-        setIsDataLoaded(true); // Mark as loaded so we can start saving updates
+        setIsDataLoaded(true);
       }
     };
-    loadData();
-  }, [currentUserRole]); // Reload when user logs in
 
-  // 2. SAVE DATA ON CHANGE (Auto-save)
+    loadData();
+  }, [currentUserRole]);
+
+  // --- SUPABASE SAVE LOGIC (Auto-Save) ---
   useEffect(() => {
-    // Only save if we have finished the initial load to avoid race conditions
     if (!isDataLoaded) return;
 
-    // Save to LocalStorage (Immediate Offline Backup)
-    try {
-      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
-    } catch (error) {
-      console.error('Local storage save failed:', error);
-    }
+    // Local Backup
+    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
 
-    // Save to Supabase (Cloud Persistence)
     const saveData = async () => {
-      // Validate role exists before saving
-      const role = localStorage.getItem('role');
+      // 1. Verify Role exists
+      const role = localStorage.getItem("role");
       if (!role) {
-        console.warn('Role missing in localStorage. Skipping Supabase save.');
+        console.error("No role found in localStorage. Login required to save!");
+        setSaveStatus('unsaved');
         return;
       }
 
       setSaveStatus('saving');
+      
       try {
+        // 2. Upsert data to Supabase using the SHARED key
         const { error } = await supabase
-          .from('app_data')
+          .from("app_data")
           .upsert({
-            role: SUPABASE_DB_KEY, // Use shared key for data persistence
+            role: SHARED_DB_KEY, // Use shared key so everyone sees updates
             data: patients,
             updated_at: new Date().toISOString()
           }, { onConflict: 'role' });
 
         if (error) {
-          console.error('Supabase save error:', error.message);
+          console.error("Supabase Save Error:", error.message);
           setSaveStatus('error');
         } else {
+          console.log("Data saved successfully for role:", role);
           setSaveStatus('saved');
           setLastSavedAt(new Date());
         }
       } catch (e) {
-        console.error('Supabase save failed:', e);
+        console.error("Supabase Save Exception:", e);
         setSaveStatus('error');
       }
     };
 
-    // Debounce to prevent flooding
-    const timeoutId = setTimeout(saveData, 2000);
+    const timeoutId = setTimeout(saveData, 2000); // Debounce
     return () => clearTimeout(timeoutId);
-
   }, [patients, isDataLoaded]);
 
-  // --- END SUPABASE INTEGRATION ---
-
-  // Real-time synchronization across tabs (Local)
+  // Sync tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
-        try {
-          setPatients(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error('Error syncing storage across tabs:', error);
-        }
+        setPatients(JSON.parse(e.newValue));
       }
     };
-
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
@@ -204,13 +192,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     const id = patientData.id.trim() !== '' 
       ? patientData.id 
       : `REG-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newPatient: Patient = {
-      ...patientData,
-      id: id,
-      registeredAt: new Date().toISOString(),
-    };
-    
+    const newPatient: Patient = { ...patientData, id, registeredAt: new Date().toISOString() };
     setPatients(prev => [newPatient, ...prev]);
   };
 
@@ -223,15 +205,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const updateDoctorAssessment = (patientId: string, assessment: DoctorAssessment) => {
-    setPatients(prev => prev.map(p => 
-      p.id === patientId ? { ...p, doctorAssessment: assessment } : p
-    ));
+    setPatients(prev => prev.map(p => p.id === patientId ? { ...p, doctorAssessment: assessment } : p));
   };
 
   const updatePackageProposal = (patientId: string, proposal: PackageProposal) => {
-    setPatients(prev => prev.map(p => 
-      p.id === patientId ? { ...p, packageProposal: proposal } : p
-    ));
+    setPatients(prev => prev.map(p => p.id === patientId ? { ...p, packageProposal: proposal } : p));
   };
 
   const getPatientById = (id: string) => patients.find(p => p.id === id);
@@ -257,8 +235,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 export const useHospital = () => {
   const context = useContext(HospitalContext);
-  if (!context) {
-    throw new Error('useHospital must be used within a HospitalProvider');
-  }
+  if (!context) throw new Error('useHospital must be used within a HospitalProvider');
   return context;
 };
