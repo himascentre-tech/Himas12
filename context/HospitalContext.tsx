@@ -23,11 +23,10 @@ const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
 
 // SHARED DATABASE KEY
-// We use a constant key for the 'role' column in Supabase so that
-// Front Office, Doctor, and Package Team all share the SAME patient list.
+// This key ensures Front Office, Doctor, and Package Team all access the SAME record in Supabase.
 const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
-// Seed Data
+// Seed Data (Only used if absolutely no data exists anywhere)
 const SEED_PATIENTS: Patient[] = [
   {
     id: 'REG-1001',
@@ -59,7 +58,7 @@ const SEED_PATIENTS: Patient[] = [
 ];
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Persist Login State
+  // 1. Initialize Role from LocalStorage
   const [currentUserRole, setCurrentUserRole] = useState<Role>(() => {
     return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
   });
@@ -68,93 +67,104 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Initialize Patients State
+  // 2. Initialize Patients from LocalStorage (Offline First)
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : SEED_PATIENTS;
+      }
       return SEED_PATIENTS;
     } catch (error) {
+      console.error("Error parsing local patients:", error);
       return SEED_PATIENTS;
     }
   });
 
-  // Effect to persist role
+  // 3. Effect: Persist Role Changes
   useEffect(() => {
     if (currentUserRole) {
       localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
-      localStorage.setItem('role', currentUserRole); // Compatibility with user prompt
+      localStorage.setItem('role', currentUserRole); 
     } else {
       localStorage.removeItem(STORAGE_KEY_ROLE);
       localStorage.removeItem('role');
     }
   }, [currentUserRole]);
 
-  // --- SUPABASE LOAD LOGIC ---
+  // 4. Effect: Load Data from Supabase (On Mount or Login)
   useEffect(() => {
     const loadData = async () => {
-      // 1. Verify Role exists in LocalStorage
-      const role = localStorage.getItem("role");
+      // Check if logged in
+      const role = localStorage.getItem("role") || currentUserRole;
       if (!role) {
-        console.warn("No role found in localStorage. Skipping load.");
+        console.warn("No active session. Skipping Cloud Load.");
         return;
       }
 
-      console.log("LOADING DATA FOR USER ROLE:", role);
+      console.log("SYNC: Loading data from Cloud...");
       setSaveStatus('saving');
 
       try {
-        // 2. Fetch data from Supabase using the SHARED key
+        // Fetch using SHARED_DB_KEY so everyone sees the same patients
         const { data, error } = await supabase
           .from("app_data")
           .select("data")
-          .eq("role", SHARED_DB_KEY) // We query the shared data
-          .single();
+          .eq("role", SHARED_DB_KEY)
+          .maybeSingle(); // Handles 0 or 1 result safely
 
         if (error) {
-          console.warn("Supabase Load Error (or no data yet):", error.message);
+          console.warn("Supabase Load Warning:", error.message);
           setSaveStatus('unsaved');
         } else if (data?.data) {
-          console.log("✅ Loaded data from Supabase");
-          setPatients(data.data as Patient[]);
-          setSaveStatus('saved');
-          setLastSavedAt(new Date());
+          console.log("✅ SYNC: Data loaded from Cloud");
+          // Update state with cloud data
+          const cloudPatients = data.data as Patient[];
+          if (Array.isArray(cloudPatients)) {
+            setPatients(cloudPatients);
+            // Update local storage immediately to match cloud
+            localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
+            setSaveStatus('saved');
+            setLastSavedAt(new Date());
+          }
+        } else {
+          console.log("SYNC: No Cloud data found. Keeping Local data.");
         }
       } catch (e) {
-        console.error("Connection failed:", e);
+        console.error("SYNC: Connection failed:", e);
         setSaveStatus('unsaved');
       } finally {
-        setIsDataLoaded(true);
+        setIsDataLoaded(true); // Allow saving to start
       }
     };
 
     loadData();
-  }, [currentUserRole]);
+  }, [currentUserRole]); // Re-run when user logs in
 
-  // --- SUPABASE SAVE LOGIC (Auto-Save) ---
+  // 5. Effect: Save Data to Supabase (On Change)
   useEffect(() => {
+    // Prevent saving before initial load completes to avoid overwriting cloud with empty state
     if (!isDataLoaded) return;
 
-    // Local Backup
+    // A. Backup to LocalStorage (Synchronous/Immediate)
     localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
 
+    // B. Save to Supabase (Async)
     const saveData = async () => {
-      // 1. Verify Role exists
-      const role = localStorage.getItem("role");
+      // Verify login status (check both storage and state for robustness)
+      const role = localStorage.getItem("role") || currentUserRole;
       if (!role) {
-        console.error("No role found in localStorage. Login required to save!");
-        setSaveStatus('unsaved');
-        return;
+        return; // User logged out, stop saving
       }
 
       setSaveStatus('saving');
       
       try {
-        // 2. Upsert data to Supabase using the SHARED key
         const { error } = await supabase
           .from("app_data")
           .upsert({
-            role: SHARED_DB_KEY, // Use shared key so everyone sees updates
+            role: SHARED_DB_KEY, // Save to the shared slot
             data: patients,
             updated_at: new Date().toISOString()
           }, { onConflict: 'role' });
@@ -163,7 +173,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           console.error("Supabase Save Error:", error.message);
           setSaveStatus('error');
         } else {
-          console.log("Data saved successfully for role:", role);
           setSaveStatus('saved');
           setLastSavedAt(new Date());
         }
@@ -173,14 +182,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     };
 
-    const timeoutId = setTimeout(saveData, 2000); // Debounce
-    return () => clearTimeout(timeoutId);
-  }, [patients, isDataLoaded]);
+    saveData();
+  }, [patients, isDataLoaded, currentUserRole]);
 
-  // Sync tabs
+  // 6. Effect: Sync across tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
+        console.log("SYNC: Tab update received");
         setPatients(JSON.parse(e.newValue));
       }
     };
@@ -188,6 +197,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  // Actions
   const addPatient = (patientData: Omit<Patient, 'registeredAt'>) => {
     const id = patientData.id.trim() !== '' 
       ? patientData.id 

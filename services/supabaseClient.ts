@@ -30,6 +30,7 @@ function createMockClient() {
       select: () => ({
         eq: () => ({
           single: async () => ({ data: null, error: { message: 'Offline mode' } }),
+          maybeSingle: async () => ({ data: null, error: null }),
         }),
       }),
       upsert: async () => ({ error: null }),
