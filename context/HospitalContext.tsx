@@ -14,6 +14,7 @@ interface HospitalContextType {
   getPatientById: (id: string) => Patient | undefined;
   saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
   lastSavedAt: Date | null;
+  refreshData: () => Promise<void>;
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
@@ -23,11 +24,9 @@ const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
 
 // SHARED DATABASE KEY
-// CRITICAL: This key is constant. It ensures that Front Office, Doctor, and Package Team
-// all access the EXACT SAME patient record in the database.
 const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
-// Seed Data (Fallback only)
+// Seed Data
 const SEED_PATIENTS: Patient[] = [
   {
     id: 'REG-1001',
@@ -80,56 +79,66 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [currentUserRole]);
 
+  // Function to load data from Cloud
+  const loadData = async () => {
+    const role = localStorage.getItem("role") || currentUserRole;
+    if (!role) return;
+
+    console.log("SYNC: Fetching master record from Cloud...");
+    setSaveStatus('saving');
+
+    try {
+      // FETCH FROM SHARED KEY (All users see the same data)
+      const { data, error } = await supabase
+        .from("app_data")
+        .select("data")
+        .eq("role", SHARED_DB_KEY)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Supabase Load Error:", error.message);
+        setSaveStatus('error');
+        // CRITICAL: Do NOT set isDataLoaded(true) here.
+        // If load fails, we should not enable auto-save, otherwise we might overwrite
+        // cloud data with our local seed data.
+        return;
+      } 
+      
+      if (data?.data) {
+        console.log("✅ SYNC: Master record loaded.");
+        const cloudPatients = data.data as Patient[];
+        if (Array.isArray(cloudPatients)) {
+          setPatients(cloudPatients);
+          // Update local backup
+          localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
+          setSaveStatus('saved');
+          setLastSavedAt(new Date());
+        }
+      } else {
+        console.log("SYNC: No cloud data found. Initializing new DB record.");
+        // If explicit success but no data, we can assume it's a fresh start
+        // and allow saving our local (seed) data.
+      }
+      
+      // Only now is it safe to enable auto-save
+      setIsDataLoaded(true);
+
+    } catch (e) {
+      console.error("SYNC: Network error:", e);
+      setSaveStatus('error');
+      // Do NOT enable auto-save on network error
+    } 
+  };
+
   // 4. Effect: Load Data from Supabase (On Mount or Login)
   useEffect(() => {
-    const loadData = async () => {
-      // We only load if a user is logged in
-      const role = localStorage.getItem("role") || currentUserRole;
-      if (!role) return;
-
-      console.log("SYNC: Fetching master record from Cloud...");
-      setSaveStatus('saving');
-
-      try {
-        // FETCH FROM SHARED KEY (All users see the same data)
-        const { data, error } = await supabase
-          .from("app_data")
-          .select("data")
-          .eq("role", SHARED_DB_KEY)
-          .maybeSingle();
-
-        if (error) {
-          console.warn("Supabase Load Error:", error.message);
-          setSaveStatus('unsaved');
-        } else if (data?.data) {
-          console.log("✅ SYNC: Master record loaded.");
-          const cloudPatients = data.data as Patient[];
-          if (Array.isArray(cloudPatients)) {
-            setPatients(cloudPatients);
-            // Update local backup
-            localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
-            setSaveStatus('saved');
-            setLastSavedAt(new Date());
-          }
-        } else {
-          console.log("SYNC: No cloud data found. Initializing...");
-          // If no cloud data, we might save our local seed data to cloud
-          setSaveStatus('unsaved');
-        }
-      } catch (e) {
-        console.error("SYNC: Network error:", e);
-        setSaveStatus('unsaved');
-      } finally {
-        setIsDataLoaded(true); 
-      }
-    };
-
     loadData();
   }, [currentUserRole]);
 
   // 5. Effect: Save Data to Supabase (On Change)
   useEffect(() => {
-    // Only save if we have finished initial loading to prevent overwriting cloud with empty state
+    // Only save if we have finished initial loading successfully
+    // This prevents overwriting the cloud with seed data if the load failed.
     if (!isDataLoaded) return;
 
     // A. Backup to LocalStorage (Immediate)
@@ -143,7 +152,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setSaveStatus('saving');
       
       try {
-        // SAVE TO SHARED KEY (Updates valid for all users)
         const { error } = await supabase
           .from("app_data")
           .upsert({
@@ -218,7 +226,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       updatePackageProposal,
       getPatientById,
       saveStatus,
-      lastSavedAt
+      lastSavedAt,
+      refreshData: loadData
     }}>
       {children}
     </HospitalContext.Provider>

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, lastSavedAt } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, lastSavedAt, refreshData } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const handleLogout = () => {
@@ -53,10 +53,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     }
     if (saveStatus === 'error') {
       return (
-        <div className="flex items-center gap-2 text-xs text-red-400">
+        <button 
+          onClick={() => refreshData()}
+          className="flex items-center gap-2 text-xs text-red-400 hover:text-red-300 transition-colors"
+          title="Click to retry connection"
+        >
           <AlertCircle className="w-3 h-3" />
-          <span>Sync Failed</span>
-        </div>
+          <span>Sync Failed (Retry)</span>
+        </button>
       );
     }
     return (
@@ -114,6 +118,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <FileText className="w-5 h-5" />
               Dashboard
             </button>
+            <button 
+              onClick={() => refreshData()}
+              className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Sync Data
+            </button>
           </nav>
         </div>
 
@@ -129,7 +140,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto h-screen">
+      <main className="flex-1 overflow-auto h-screen relative">
+        {saveStatus === 'error' && (
+          <div className="bg-red-500 text-white text-xs font-bold text-center py-1 absolute top-0 left-0 right-0 z-10">
+            CONNECTION ERROR: Data is not syncing. Please check internet and click 'Sync Data'.
+          </div>
+        )}
         <div className="p-6 max-w-7xl mx-auto">
           {children}
         </div>
