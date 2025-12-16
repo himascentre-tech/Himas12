@@ -6,6 +6,8 @@ interface HospitalContextType {
   setCurrentUserRole: (role: Role) => void;
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'registeredAt'>) => void; 
+  updatePatient: (patient: Patient) => void;
+  deletePatient: (id: string) => void;
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => void;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => void;
   getPatientById: (id: string) => Patient | undefined;
@@ -96,6 +98,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setPatients(prev => [newPatient, ...prev]);
   };
 
+  const updatePatient = (updatedPatient: Patient) => {
+    setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+  };
+
+  const deletePatient = (id: string) => {
+    setPatients(prev => prev.filter(p => p.id !== id));
+  };
+
   const updateDoctorAssessment = (patientId: string, assessment: DoctorAssessment) => {
     setPatients(prev => prev.map(p => 
       p.id === patientId ? { ...p, doctorAssessment: assessment } : p
@@ -116,6 +126,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setCurrentUserRole,
       patients,
       addPatient,
+      updatePatient,
+      deletePatient,
       updateDoctorAssessment,
       updatePackageProposal,
       getPatientById

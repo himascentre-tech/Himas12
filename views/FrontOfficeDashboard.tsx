@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Gender, Feeling, Patient } from '../types';
-import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar, Pencil, Trash2, AlertCircle } from 'lucide-react';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient } = useHospital();
+  const { patients, addPatient, updatePatient, deletePatient } = useHospital();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // Form State
   const [formData, setFormData] = useState<Partial<Patient>>({
@@ -24,24 +25,67 @@ export const FrontOfficeDashboard: React.FC = () => {
     feeling: Feeling.Fine
   });
 
+  const resetForm = () => {
+    setFormData({
+      id: '',
+      name: '',
+      dob: '',
+      gender: Gender.Male,
+      age: undefined,
+      mobile: '',
+      occupation: '',
+      hasInsurance: 'No',
+      insuranceName: '',
+      source: '',
+      feeling: Feeling.Fine
+    });
+    setEditingId(null);
+  };
+
+  const handleEdit = (patient: Patient) => {
+    setFormData({
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob || '',
+      gender: patient.gender,
+      age: patient.age,
+      mobile: patient.mobile,
+      occupation: patient.occupation,
+      hasInsurance: patient.hasInsurance,
+      insuranceName: patient.insuranceName || '',
+      source: patient.source,
+      feeling: patient.feeling
+    });
+    setEditingId(patient.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete patient record for "${name}"? This action cannot be undone.`)) {
+      deletePatient(id);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.age && formData.mobile) {
-      addPatient(formData as any);
+      if (editingId) {
+        // Edit Mode
+        const originalPatient = patients.find(p => p.id === editingId);
+        if (originalPatient) {
+          updatePatient({
+            ...originalPatient,
+            ...formData as Patient,
+            id: editingId // Ensure ID doesn't change during edit just in case
+          });
+        }
+      } else {
+        // Create Mode
+        addPatient(formData as any);
+      }
+      
       setShowForm(false);
-      setFormData({
-        id: '',
-        name: '',
-        dob: '',
-        gender: Gender.Male,
-        age: undefined,
-        mobile: '',
-        occupation: '',
-        hasInsurance: 'No',
-        insuranceName: '',
-        source: '',
-        feeling: Feeling.Fine
-      });
+      resetForm();
     }
   };
 
@@ -116,7 +160,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           />
         </div>
         <button 
-          onClick={() => setShowForm(true)}
+          onClick={() => { resetForm(); setShowForm(true); }}
           className="bg-hospital-600 text-white px-6 py-3 rounded-lg hover:bg-hospital-700 flex items-center gap-2 font-bold shadow-lg shadow-hospital-200"
         >
           <PlusCircle className="w-5 h-5" />
@@ -138,8 +182,8 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <ArrowLeft className="w-6 h-6 text-gray-600" />
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">New Patient Registration</h1>
-                  <p className="text-sm text-gray-500">Fill in the basic details form below</p>
+                  <h1 className="text-2xl font-bold text-gray-900">{editingId ? 'Edit Patient Details' : 'New Patient Registration'}</h1>
+                  <p className="text-sm text-gray-500">{editingId ? 'Update the information below' : 'Fill in the basic details form below'}</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -163,14 +207,15 @@ export const FrontOfficeDashboard: React.FC = () => {
                 {/* File Number */}
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                     <FileText className="w-4 h-4" /> File Registration Number (Optional)
+                     <FileText className="w-4 h-4" /> File Registration Number {editingId ? '(Read Only)' : '(Optional)'}
                    </label>
                    <input 
                      type="text" 
                      placeholder="Enter File Number manually (or leave blank for auto-generate)"
-                     className="w-full border p-2 rounded focus:border-hospital-500 focus:outline-none bg-white font-mono text-lg uppercase"
+                     className={`w-full border p-2 rounded focus:border-hospital-500 focus:outline-none bg-white font-mono text-lg uppercase ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                      value={formData.id}
-                     onChange={e => setFormData({...formData, id: e.target.value})}
+                     onChange={e => !editingId && setFormData({...formData, id: e.target.value})}
+                     readOnly={!!editingId}
                    />
                 </div>
 
@@ -357,7 +402,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 text-gray-700 font-medium hover:bg-gray-100 rounded-xl">Cancel</button>
                   <button type="submit" className="px-8 py-3 bg-hospital-600 text-white font-bold rounded-xl hover:bg-hospital-700 shadow-xl shadow-hospital-200 transform hover:-translate-y-1 transition-all flex items-center gap-2">
                     <Save className="w-5 h-5" />
-                    Register Patient
+                    {editingId ? 'Update Patient' : 'Register Patient'}
                   </button>
                 </div>
               </form>
@@ -377,11 +422,12 @@ export const FrontOfficeDashboard: React.FC = () => {
               <th className="p-4">Feeling</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Registered</th>
+              <th className="p-4 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredPatients.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-gray-400">No patients found.</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-gray-400">No patients found.</td></tr>
             ) : filteredPatients.map(p => (
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4 font-mono text-sm text-gray-600">{p.id}</td>
@@ -414,6 +460,24 @@ export const FrontOfficeDashboard: React.FC = () => {
                 </td>
                 <td className="p-4 text-right text-gray-500 text-sm">
                   {new Date(p.registeredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </td>
+                <td className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <button 
+                      onClick={() => handleEdit(p)}
+                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit Patient"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(p.id, p.name)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete Patient"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
