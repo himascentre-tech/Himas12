@@ -6,12 +6,14 @@ export enum Gender {
   Other = 'Other',
 }
 
-export enum Feeling {
-  Fine = 'Fine',
-  Curious = 'Curious',
-  SlightPain = 'Slight Pain',
-  SickOrTired = 'Sick or Tired',
-  ImmediateHelp = 'Immediate Help',
+export enum Condition {
+  Piles = 'Piles',
+  Fissure = 'Fissure',
+  Fistula = 'Fistula',
+  Hernia = 'Hernia',
+  Gallstones = 'Gallstones',
+  Appendix = 'Appendix',
+  VaricoseVeins = 'Varicose Veins',
 }
 
 export enum SurgeonCode {
@@ -68,7 +70,7 @@ export interface Patient {
   hasInsurance: 'Yes' | 'No' | 'Not Sure';
   insuranceName?: string; // New field for insurance provider
   source: string; // How did you know
-  feeling: Feeling;
+  condition: Condition;
   registeredAt: string;
   
   // Role Specific Data

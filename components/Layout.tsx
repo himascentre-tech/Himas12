@@ -24,12 +24,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     }
   };
 
+  // Logo URL - Replace this with your actual logo path
+  const LOGO_URL_DARK = "https://placehold.co/400x120/0f172a/ffffff?text=HiMAS"; // For Dark Sidebar
+  const LOGO_URL_LIGHT = "https://placehold.co/400x120/ffffff/0284c7?text=HiMAS"; // For Light Mobile Header
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
       <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
-        <div className="flex items-center gap-2 text-hospital-700 font-bold text-xl">
-           <PlusSquare /> Himas Hospital
+        <div className="flex items-center gap-2">
+           <img 
+             src={LOGO_URL_LIGHT} 
+             alt="Himas Hospital" 
+             className="h-8 w-auto"
+           />
         </div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           {isSidebarOpen ? <X /> : <Menu />}
@@ -43,11 +51,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-6">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-2 bg-hospital-500 rounded-lg">
-              <PlusSquare className="w-6 h-6 text-white" />
+          <div className="mb-8 px-2">
+            <img 
+              src={LOGO_URL_DARK} 
+              alt="Himas Hospital" 
+              className="h-12 w-auto"
+            />
+            <div className="text-[0.6rem] text-slate-400 mt-1 uppercase tracking-widest font-semibold">
+              21st Century Surgical Hospital
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Himas Hospital</h1>
           </div>
 
           <div className="mb-8">

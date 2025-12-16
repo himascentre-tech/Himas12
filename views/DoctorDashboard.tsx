@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { ExportButtons } from '../components/ExportButtons';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
@@ -80,7 +79,9 @@ export const DoctorDashboard: React.FC = () => {
                 <div className="text-xs font-mono text-gray-400">{p.id}</div>
               </div>
               <div className="mt-2 flex gap-2">
-                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{p.feeling}</span>
+                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded flex items-center gap-1">
+                  <Activity className="w-3 h-3" /> {p.condition}
+                </span>
               </div>
             </div>
           ))}
@@ -108,17 +109,27 @@ export const DoctorDashboard: React.FC = () => {
             <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold text-gray-800">Medical Evaluation</h2>
-                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                  <span>{selectedPatient.name}</span>
-                  <span>•</span>
-                  <span>{selectedPatient.age} yrs</span>
-                  <span>•</span>
-                  <span className="text-red-600 font-medium">Complaint: {selectedPatient.feeling}</span>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-2">
+                  <span className="flex items-center gap-1"><User className="w-3 h-3" /> {selectedPatient.name}, {selectedPatient.age} yrs</span>
+                  <span className="flex items-center gap-1 text-hospital-700 font-medium bg-hospital-50 px-2 py-0.5 rounded-full"><Activity className="w-3 h-3" /> {selectedPatient.condition}</span>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-400">Registered At</div>
                 <div className="font-mono text-sm">{new Date(selectedPatient.registeredAt).toLocaleTimeString()}</div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 bg-blue-50/50 border-b border-blue-100 grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <Briefcase className="w-4 h-4 text-gray-400" />
+                <span className="font-semibold text-gray-500 text-xs uppercase">Occupation:</span>
+                <span>{selectedPatient.occupation || 'N/A'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <CreditCard className="w-4 h-4 text-gray-400" />
+                <span className="font-semibold text-gray-500 text-xs uppercase">Insurance:</span>
+                <span>{selectedPatient.hasInsurance} {selectedPatient.insuranceName ? `(${selectedPatient.insuranceName})` : ''}</span>
               </div>
             </div>
 

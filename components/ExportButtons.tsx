@@ -45,7 +45,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       'Insurance',
       'Insurance Provider',
       'Source',
-      'Current Feeling',
+      'Condition',
       'Registration Time',
       // Doctor Data
       'Doctor Assessed', 
@@ -74,7 +74,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       p.hasInsurance,
       p.insuranceName || 'N/A',
       p.source,
-      p.feeling,
+      p.condition,
       new Date(p.registeredAt).toLocaleString(),
       
       // Doctor

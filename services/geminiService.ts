@@ -27,7 +27,7 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       - Name: ${patient.name}
       - Age: ${patient.age}
       - Occupation: ${patient.occupation}
-      - Feeling: ${patient.feeling}
+      - Condition: ${patient.condition}
       
       Doctor's Assessment:
       - Recommendation: ${patient.doctorAssessment?.quickCode}

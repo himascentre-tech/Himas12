@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Feeling } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Condition } from '../types';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -15,6 +15,10 @@ interface HospitalContextType {
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
+// Storage Keys
+const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
+const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
+
 // Seed Data
 const SEED_PATIENTS: Patient[] = [
   {
@@ -28,7 +32,7 @@ const SEED_PATIENTS: Patient[] = [
     hasInsurance: 'Yes',
     insuranceName: 'Aetna Health',
     source: 'Google',
-    feeling: Feeling.SlightPain,
+    condition: Condition.Hernia,
     registeredAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
@@ -41,7 +45,7 @@ const SEED_PATIENTS: Patient[] = [
     occupation: 'Retired',
     hasInsurance: 'No',
     source: 'Doctor Recommended',
-    feeling: Feeling.SickOrTired,
+    condition: Condition.Piles,
     registeredAt: new Date().toISOString(),
   }
 ];
@@ -49,33 +53,53 @@ const SEED_PATIENTS: Patient[] = [
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Persist Login State
   const [currentUserRole, setCurrentUserRole] = useState<Role>(() => {
-    return (localStorage.getItem('mediflow_role') as Role) || null;
+    return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
   });
 
+  // Initialize Patients State
   const [patients, setPatients] = useState<Patient[]>(() => {
-    const saved = localStorage.getItem('mediflow_patients');
-    return saved ? JSON.parse(saved) : SEED_PATIENTS;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
+      // If we have saved data, parse and use it
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      // If no data exists (first run), initialize with seed data AND save it immediately
+      // This ensures subsequent reloads see the data in storage, even if it's the seed data
+      return SEED_PATIENTS;
+    } catch (error) {
+      console.error('Error loading patients from storage:', error);
+      return SEED_PATIENTS;
+    }
   });
 
   // Effect to persist role
   useEffect(() => {
     if (currentUserRole) {
-      localStorage.setItem('mediflow_role', currentUserRole);
+      localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
     } else {
-      localStorage.removeItem('mediflow_role');
+      localStorage.removeItem(STORAGE_KEY_ROLE);
     }
   }, [currentUserRole]);
 
-  // Effect to persist patients
+  // Effect to persist patients whenever they change
   useEffect(() => {
-    localStorage.setItem('mediflow_patients', JSON.stringify(patients));
+    try {
+      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
+    } catch (error) {
+      console.error('Error saving patients to storage:', error);
+    }
   }, [patients]);
 
   // Real-time synchronization across tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'mediflow_patients' && e.newValue) {
-        setPatients(JSON.parse(e.newValue));
+      if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
+        try {
+          setPatients(JSON.parse(e.newValue));
+        } catch (error) {
+          console.error('Error syncing storage across tabs:', error);
+        }
       }
     };
 
@@ -94,7 +118,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       registeredAt: new Date().toISOString(),
     };
     
-    // Update state - persistence handled by useEffect
     setPatients(prev => [newPatient, ...prev]);
   };
 

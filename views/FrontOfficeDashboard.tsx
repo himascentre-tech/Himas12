@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
-import { Gender, Feeling, Patient } from '../types';
-import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { Gender, Condition, Patient } from '../types';
+import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar, Pencil, Trash2, Activity } from 'lucide-react';
 
 export const FrontOfficeDashboard: React.FC = () => {
   const { patients, addPatient, updatePatient, deletePatient } = useHospital();
@@ -22,7 +22,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     hasInsurance: 'No',
     insuranceName: '',
     source: '',
-    feeling: Feeling.Fine
+    condition: Condition.Piles // Default
   });
 
   const resetForm = () => {
@@ -37,7 +37,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       hasInsurance: 'No',
       insuranceName: '',
       source: '',
-      feeling: Feeling.Fine
+      condition: Condition.Piles
     });
     setEditingId(null);
   };
@@ -54,7 +54,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       hasInsurance: patient.hasInsurance,
       insuranceName: patient.insuranceName || '',
       source: patient.source,
-      feeling: patient.feeling
+      condition: patient.condition
     });
     setEditingId(patient.id);
     setShowForm(true);
@@ -365,32 +365,32 @@ export const FrontOfficeDashboard: React.FC = () => {
                       </div>
                    </div>
 
-                   {/* Feeling */}
+                   {/* Condition */}
                    <div>
                       <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <div className="text-red-500">❤️</div>
-                        How Am I Feeling Right Now?
+                        <Activity className="w-5 h-5 text-red-500" />
+                        Condition / Complaint
                       </label>
                       <div className="space-y-3">
-                         {Object.values(Feeling).map((f) => (
-                           <label key={f} className={`
+                         {Object.values(Condition).map((c) => (
+                           <label key={c} className={`
                               flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all
-                              ${formData.feeling === f 
+                              ${formData.condition === c 
                                 ? 'border-hospital-500 bg-hospital-50 ring-1 ring-hospital-500' 
                                 : 'border-gray-200 hover:border-hospital-200 hover:bg-gray-50'}
                            `}>
                               <input 
                                 type="radio" 
-                                name="feeling" 
+                                name="condition" 
                                 className="hidden"
-                                checked={formData.feeling === f} 
-                                onChange={() => setFormData({...formData, feeling: f})}
+                                checked={formData.condition === c} 
+                                onChange={() => setFormData({...formData, condition: c})}
                               />
-                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.feeling === f ? 'border-hospital-500' : 'border-gray-300'}`}>
-                                {formData.feeling === f && <div className="w-2 h-2 bg-hospital-500 rounded-full" />}
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.condition === c ? 'border-hospital-500' : 'border-gray-300'}`}>
+                                {formData.condition === c && <div className="w-2 h-2 bg-hospital-500 rounded-full" />}
                               </div>
-                              <span className={`text-lg ${formData.feeling === f ? 'font-bold text-hospital-800' : 'text-gray-600'}`}>
-                                {f}
+                              <span className={`text-lg ${formData.condition === c ? 'font-bold text-hospital-800' : 'text-gray-600'}`}>
+                                {c}
                               </span>
                            </label>
                          ))}
@@ -419,7 +419,7 @@ export const FrontOfficeDashboard: React.FC = () => {
               <th className="p-4">File No</th>
               <th className="p-4">Patient</th>
               <th className="p-4">Mobile</th>
-              <th className="p-4">Feeling</th>
+              <th className="p-4">Condition</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Registered</th>
               <th className="p-4 text-center">Actions</th>
@@ -437,13 +437,8 @@ export const FrontOfficeDashboard: React.FC = () => {
                 </td>
                 <td className="p-4 text-gray-600">{p.mobile}</td>
                 <td className="p-4">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    p.feeling === Feeling.ImmediateHelp ? 'bg-red-100 text-red-700' :
-                    p.feeling === Feeling.SlightPain ? 'bg-orange-100 text-orange-700' :
-                    p.feeling === Feeling.SickOrTired ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {p.feeling}
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-hospital-100 text-hospital-700">
+                    {p.condition}
                   </span>
                 </td>
                 <td className="p-4">

@@ -39,13 +39,19 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4">
       <div className="text-center mb-8">
-        <div className="flex justify-center mb-4">
-          <div className="p-4 bg-hospital-600 rounded-2xl shadow-lg">
-            <Activity className="w-12 h-12 text-white" />
-          </div>
+        <div className="flex justify-center mb-6">
+          {/* 
+            TODO: Replace the src below with your actual logo URL or file path (e.g., "/logo.png")
+            The placeholder simulates the HiMAS logo appearance.
+          */}
+          <img 
+            src="https://placehold.co/600x200/f8fafc/0284c7?text=HiMAS+Hospital&font=montserrat" 
+            alt="Himas Hospital Logo"
+            className="h-28 w-auto object-contain"
+          />
         </div>
-        <h1 className="text-4xl font-extrabold text-slate-800 mb-2">Himas Hospital</h1>
-        <p className="text-slate-500">Secure Management Portal</p>
+        <p className="text-slate-600 font-bold tracking-wide text-lg">21st Century Surgical Hospital</p>
+        <p className="text-slate-400 text-sm mt-1">Secure Management Portal</p>
       </div>
 
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md">

@@ -108,7 +108,7 @@ export const PackageTeamDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-sm text-gray-500 mb-2">
-                  {p.doctorAssessment?.conversionReadiness} • {p.doctorAssessment?.affordability}
+                  {p.doctorAssessment?.conversionReadiness} • {p.condition}
                 </div>
                 {p.doctorAssessment?.painSeverity === 'High' && (
                   <div className="flex items-center gap-1 text-xs text-red-600">
