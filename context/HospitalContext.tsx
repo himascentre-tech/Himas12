@@ -93,12 +93,20 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // --- SUPABASE INTEGRATION ---
 
-  // 1. LOAD DATA ON MOUNT
+  // 1. LOAD DATA ON MOUNT OR LOGIN
   useEffect(() => {
     const loadData = async () => {
+      // Check if role exists as per requirements
+      const role = localStorage.getItem('role');
+      if (!role) {
+        setSaveStatus('unsaved');
+        return; 
+      }
+
       try {
         setSaveStatus('saving'); // Indicate loading
         // Attempt to fetch from Supabase
+        // We use a shared key (SUPABASE_DB_KEY) to ensure all roles share the same patient data
         const { data, error } = await supabase
           .from('app_data')
           .select('data')
@@ -122,7 +130,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     };
     loadData();
-  }, []);
+  }, [currentUserRole]); // Reload when user logs in
 
   // 2. SAVE DATA ON CHANGE (Auto-save)
   useEffect(() => {
@@ -136,15 +144,21 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('Local storage save failed:', error);
     }
 
-    setSaveStatus('saving');
-
     // Save to Supabase (Cloud Persistence)
     const saveData = async () => {
+      // Validate role exists before saving
+      const role = localStorage.getItem('role');
+      if (!role) {
+        console.warn('Role missing in localStorage. Skipping Supabase save.');
+        return;
+      }
+
+      setSaveStatus('saving');
       try {
         const { error } = await supabase
           .from('app_data')
           .upsert({
-            role: SUPABASE_DB_KEY,
+            role: SUPABASE_DB_KEY, // Use shared key for data persistence
             data: patients,
             updated_at: new Date().toISOString()
           }, { onConflict: 'role' });
