@@ -1,9 +1,9 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, PlusSquare } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, PlusSquare, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, lastSavedAt } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const getRoleLabel = () => {
@@ -22,6 +22,40 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       case 'PACKAGE_TEAM': return <Briefcase className="w-6 h-6" />;
       default: return <FileText className="w-6 h-6" />;
     }
+  };
+
+  // Status Indicator Component
+  const CloudStatus = () => {
+    if (saveStatus === 'saving') {
+      return (
+        <div className="flex items-center gap-2 text-xs text-blue-400 animate-pulse">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span>Syncing...</span>
+        </div>
+      );
+    }
+    if (saveStatus === 'saved') {
+      return (
+        <div className="flex items-center gap-2 text-xs text-green-400" title={`Last saved: ${lastSavedAt?.toLocaleTimeString()}`}>
+          <Check className="w-3 h-3" />
+          <span>Cloud Synced</span>
+        </div>
+      );
+    }
+    if (saveStatus === 'error') {
+      return (
+        <div className="flex items-center gap-2 text-xs text-red-400">
+          <AlertCircle className="w-3 h-3" />
+          <span>Sync Failed</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2 text-xs text-gray-500">
+        <Cloud className="w-3 h-3" />
+        <span>Offline Mode</span>
+      </div>
+    );
   };
 
   // Logo URL - Replace this with your actual logo path
@@ -68,8 +102,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <div className="text-hospital-400">{getRoleIcon()}</div>
               <div>
                 <div className="font-medium text-slate-200">{getRoleLabel()}</div>
-                <div className="text-xs text-green-400 flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Online
+                <div className="mt-1">
+                  <CloudStatus />
                 </div>
               </div>
             </div>

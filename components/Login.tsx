@@ -18,32 +18,31 @@ export const Login: React.FC = () => {
     // Doctor: DoctorHimas / Doctor8419@
     // Package Team: Team1984 / Team8131@
 
+    let role: Role = null;
+
     if (userId === 'Himasoffice' && password === 'Himas1984@') {
-      setCurrentUserRole('FRONT_OFFICE');
-      return;
-    }
-
-    if (userId === 'DoctorHimas' && password === 'Doctor8419@') {
-      setCurrentUserRole('DOCTOR');
-      return;
-    }
-
-    if (userId === 'Team1984' && password === 'Team8131@') {
-      setCurrentUserRole('PACKAGE_TEAM');
-      return;
+      role = 'FRONT_OFFICE';
+    } else if (userId === 'DoctorHimas' && password === 'Doctor8419@') {
+      role = 'DOCTOR';
+    } else if (userId === 'Team1984' && password === 'Team8131@') {
+      role = 'PACKAGE_TEAM';
     }
     
-    setError('Invalid User ID or Password');
+    if (role) {
+      // 1. Update Context (which handles the app state)
+      setCurrentUserRole(role);
+      // 2. Explicitly set 'role' in localStorage as per requirement check
+      localStorage.setItem('role', role);
+      console.log("Logged in as:", role);
+    } else {
+      setError('Invalid User ID or Password');
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4">
       <div className="text-center mb-8">
         <div className="flex justify-center mb-6">
-          {/* 
-            TODO: Replace the src below with your actual logo URL or file path (e.g., "/logo.png")
-            The placeholder simulates the HiMAS logo appearance.
-          */}
           <img 
             src="https://placehold.co/600x200/f8fafc/0284c7?text=HiMAS+Hospital&font=montserrat" 
             alt="Himas Hospital Logo"

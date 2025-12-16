@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Condition } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -11,6 +12,8 @@ interface HospitalContextType {
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => void;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => void;
   getPatientById: (id: string) => Patient | undefined;
+  saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
+  lastSavedAt: Date | null;
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
@@ -18,6 +21,10 @@ const HospitalContext = createContext<HospitalContextType | undefined>(undefined
 // Storage Keys
 const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
+
+// We use a shared key so Front Office, Doctor, and Package Team all see the SAME data.
+// This simulates a shared database environment.
+const SUPABASE_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
 // Seed Data
 const SEED_PATIENTS: Patient[] = [
@@ -56,19 +63,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
   });
 
-  // Initialize Patients State
+  // Flag to prevent overwriting cloud data with empty local state on initial load
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  // Initialize Patients State with Local Storage fallback
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      // If we have saved data, parse and use it
-      if (saved) {
-        return JSON.parse(saved);
-      }
-      // If no data exists (first run), initialize with seed data AND save it immediately
-      // This ensures subsequent reloads see the data in storage, even if it's the seed data
+      if (saved) return JSON.parse(saved);
       return SEED_PATIENTS;
     } catch (error) {
-      console.error('Error loading patients from storage:', error);
       return SEED_PATIENTS;
     }
   });
@@ -77,21 +83,94 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (currentUserRole) {
       localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
+      // Also set the generic 'role' key as requested for compatibility/debugging
+      localStorage.setItem('role', currentUserRole);
     } else {
       localStorage.removeItem(STORAGE_KEY_ROLE);
+      localStorage.removeItem('role');
     }
   }, [currentUserRole]);
 
-  // Effect to persist patients whenever they change
+  // --- SUPABASE INTEGRATION ---
+
+  // 1. LOAD DATA ON MOUNT
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        setSaveStatus('saving'); // Indicate loading
+        // Attempt to fetch from Supabase
+        const { data, error } = await supabase
+          .from('app_data')
+          .select('data')
+          .eq('role', SUPABASE_DB_KEY)
+          .single();
+
+        if (data?.data) {
+          console.log('✅ Loaded data from Supabase');
+          setPatients(data.data as Patient[]);
+          setSaveStatus('saved');
+          setLastSavedAt(new Date());
+        } else if (error) {
+          console.warn('Supabase fetch error (using local data):', error.message);
+          setSaveStatus('unsaved');
+        }
+      } catch (e) {
+        console.error('Supabase connection failed, using offline data.');
+        setSaveStatus('unsaved');
+      } finally {
+        setIsDataLoaded(true); // Mark as loaded so we can start saving updates
+      }
+    };
+    loadData();
+  }, []);
+
+  // 2. SAVE DATA ON CHANGE (Auto-save)
+  useEffect(() => {
+    // Only save if we have finished the initial load to avoid race conditions
+    if (!isDataLoaded) return;
+
+    // Save to LocalStorage (Immediate Offline Backup)
     try {
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
     } catch (error) {
-      console.error('Error saving patients to storage:', error);
+      console.error('Local storage save failed:', error);
     }
-  }, [patients]);
 
-  // Real-time synchronization across tabs
+    setSaveStatus('saving');
+
+    // Save to Supabase (Cloud Persistence)
+    const saveData = async () => {
+      try {
+        const { error } = await supabase
+          .from('app_data')
+          .upsert({
+            role: SUPABASE_DB_KEY,
+            data: patients,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'role' });
+
+        if (error) {
+          console.error('Supabase save error:', error.message);
+          setSaveStatus('error');
+        } else {
+          setSaveStatus('saved');
+          setLastSavedAt(new Date());
+        }
+      } catch (e) {
+        console.error('Supabase save failed:', e);
+        setSaveStatus('error');
+      }
+    };
+
+    // Debounce to prevent flooding
+    const timeoutId = setTimeout(saveData, 2000);
+    return () => clearTimeout(timeoutId);
+
+  }, [patients, isDataLoaded]);
+
+  // --- END SUPABASE INTEGRATION ---
+
+  // Real-time synchronization across tabs (Local)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
@@ -153,7 +232,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       deletePatient,
       updateDoctorAssessment,
       updatePackageProposal,
-      getPatientById
+      getPatientById,
+      saveStatus,
+      lastSavedAt
     }}>
       {children}
     </HospitalContext.Provider>
