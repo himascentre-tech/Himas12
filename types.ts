@@ -14,6 +14,7 @@ export enum Condition {
   Gallstones = 'Gallstones',
   Appendix = 'Appendix',
   VaricoseVeins = 'Varicose Veins',
+  Other = 'Other',
 }
 
 export enum SurgeonCode {
