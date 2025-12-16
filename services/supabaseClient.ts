@@ -10,9 +10,11 @@ declare const process: {
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
+export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
+
 let client;
 
-if (SUPABASE_URL && SUPABASE_KEY) {
+if (isSupabaseConfigured) {
   try {
     client = createClient(SUPABASE_URL, SUPABASE_KEY);
   } catch (error) {
