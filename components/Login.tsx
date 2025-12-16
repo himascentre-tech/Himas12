@@ -15,12 +15,17 @@ export const Login: React.FC = () => {
 
     let role: Role = null;
 
-    // Credentials Logic as per requirements
+    // CREDENTIALS CHECK
+    // 1. Front Office
     if (userId === "Himasoffice" && password === "Himas1984@") {
       role = "FRONT_OFFICE";
-    } else if (userId === "DoctorHimas" && password === "Doctor8419@") {
+    } 
+    // 2. Doctor
+    else if (userId === "DoctorHimas" && password === "Doctor8419@") {
       role = "DOCTOR";
-    } else if (userId === "Team1984" && password === "Team8131@") {
+    } 
+    // 3. Package Team
+    else if (userId === "Team1984" && password === "Team8131@") {
       role = "PACKAGE_TEAM";
     }
     
@@ -28,13 +33,13 @@ export const Login: React.FC = () => {
       // 1. Update Context
       setCurrentUserRole(role);
       
-      // 2. Store specific keys as requested
+      // 2. Persist Session
       localStorage.setItem("role", role);
       localStorage.setItem("username", userId);
       
-      console.log("Logged in successfully:", role);
+      console.log(`Login Successful: ${role}`);
     } else {
-      setError('Invalid User ID or Password');
+      setError('Invalid User ID or Password. Please try again.');
     }
   };
 
@@ -56,7 +61,7 @@ export const Login: React.FC = () => {
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold text-gray-800">Staff Login</h2>
-            <p className="text-sm text-gray-400">Please enter your credentials</p>
+            <p className="text-sm text-gray-400">Please enter your authorized credentials</p>
           </div>
 
           <div>
@@ -89,7 +94,8 @@ export const Login: React.FC = () => {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center font-medium border border-red-100">
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center font-medium border border-red-100 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-red-500 rounded-full"></span>
               {error}
             </div>
           )}

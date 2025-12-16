@@ -23,10 +23,11 @@ const STORAGE_KEY_PATIENTS = 'himas_hospital_patients_v1';
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
 
 // SHARED DATABASE KEY
-// This key ensures Front Office, Doctor, and Package Team all access the SAME record in Supabase.
+// CRITICAL: This key is constant. It ensures that Front Office, Doctor, and Package Team
+// all access the EXACT SAME patient record in the database.
 const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
 
-// Seed Data (Only used if absolutely no data exists anywhere)
+// Seed Data (Fallback only)
 const SEED_PATIENTS: Patient[] = [
   {
     id: 'REG-1001',
@@ -41,19 +42,6 @@ const SEED_PATIENTS: Patient[] = [
     source: 'Google',
     condition: Condition.Hernia,
     registeredAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'REG-1002',
-    name: 'Michael Chen',
-    dob: '1962-08-20',
-    gender: Gender.Male,
-    age: 62,
-    mobile: '555-0198',
-    occupation: 'Retired',
-    hasInsurance: 'No',
-    source: 'Doctor Recommended',
-    condition: Condition.Piles,
-    registeredAt: new Date().toISOString(),
   }
 ];
 
@@ -67,7 +55,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // 2. Initialize Patients from LocalStorage (Offline First)
+  // 2. Initialize Patients (Offline First Strategy)
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PATIENTS);
@@ -77,7 +65,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       return SEED_PATIENTS;
     } catch (error) {
-      console.error("Error parsing local patients:", error);
       return SEED_PATIENTS;
     }
   });
@@ -96,75 +83,71 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   // 4. Effect: Load Data from Supabase (On Mount or Login)
   useEffect(() => {
     const loadData = async () => {
-      // Check if logged in
+      // We only load if a user is logged in
       const role = localStorage.getItem("role") || currentUserRole;
-      if (!role) {
-        console.warn("No active session. Skipping Cloud Load.");
-        return;
-      }
+      if (!role) return;
 
-      console.log("SYNC: Loading data from Cloud...");
+      console.log("SYNC: Fetching master record from Cloud...");
       setSaveStatus('saving');
 
       try {
-        // Fetch using SHARED_DB_KEY so everyone sees the same patients
+        // FETCH FROM SHARED KEY (All users see the same data)
         const { data, error } = await supabase
           .from("app_data")
           .select("data")
           .eq("role", SHARED_DB_KEY)
-          .maybeSingle(); // Handles 0 or 1 result safely
+          .maybeSingle();
 
         if (error) {
-          console.warn("Supabase Load Warning:", error.message);
+          console.warn("Supabase Load Error:", error.message);
           setSaveStatus('unsaved');
         } else if (data?.data) {
-          console.log("✅ SYNC: Data loaded from Cloud");
-          // Update state with cloud data
+          console.log("✅ SYNC: Master record loaded.");
           const cloudPatients = data.data as Patient[];
           if (Array.isArray(cloudPatients)) {
             setPatients(cloudPatients);
-            // Update local storage immediately to match cloud
+            // Update local backup
             localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
             setSaveStatus('saved');
             setLastSavedAt(new Date());
           }
         } else {
-          console.log("SYNC: No Cloud data found. Keeping Local data.");
+          console.log("SYNC: No cloud data found. Initializing...");
+          // If no cloud data, we might save our local seed data to cloud
+          setSaveStatus('unsaved');
         }
       } catch (e) {
-        console.error("SYNC: Connection failed:", e);
+        console.error("SYNC: Network error:", e);
         setSaveStatus('unsaved');
       } finally {
-        setIsDataLoaded(true); // Allow saving to start
+        setIsDataLoaded(true); 
       }
     };
 
     loadData();
-  }, [currentUserRole]); // Re-run when user logs in
+  }, [currentUserRole]);
 
   // 5. Effect: Save Data to Supabase (On Change)
   useEffect(() => {
-    // Prevent saving before initial load completes to avoid overwriting cloud with empty state
+    // Only save if we have finished initial loading to prevent overwriting cloud with empty state
     if (!isDataLoaded) return;
 
-    // A. Backup to LocalStorage (Synchronous/Immediate)
+    // A. Backup to LocalStorage (Immediate)
     localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
 
     // B. Save to Supabase (Async)
     const saveData = async () => {
-      // Verify login status (check both storage and state for robustness)
       const role = localStorage.getItem("role") || currentUserRole;
-      if (!role) {
-        return; // User logged out, stop saving
-      }
+      if (!role) return; // Don't save if logged out
 
       setSaveStatus('saving');
       
       try {
+        // SAVE TO SHARED KEY (Updates valid for all users)
         const { error } = await supabase
           .from("app_data")
           .upsert({
-            role: SHARED_DB_KEY, // Save to the shared slot
+            role: SHARED_DB_KEY, // Constant key for synchronization
             data: patients,
             updated_at: new Date().toISOString()
           }, { onConflict: 'role' });
@@ -185,11 +168,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     saveData();
   }, [patients, isDataLoaded, currentUserRole]);
 
-  // 6. Effect: Sync across tabs
+  // 6. Effect: Cross-tab Synchronization
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_PATIENTS && e.newValue) {
-        console.log("SYNC: Tab update received");
         setPatients(JSON.parse(e.newValue));
       }
     };

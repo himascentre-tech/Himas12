@@ -7,8 +7,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const handleLogout = () => {
+    // Clear Session
     localStorage.removeItem("role");
     localStorage.removeItem("username");
+    // We do NOT clear STORAGE_KEY_PATIENTS here so the data remains cached for next login,
+    // but context will reset role to null, showing login screen.
     setCurrentUserRole(null);
   };
 
