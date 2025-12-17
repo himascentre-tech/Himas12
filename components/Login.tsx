@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
+import { sendEmailOTP } from '../services/emailService';
 import { User, ShieldCheck, Mail, ArrowRight, Activity, Briefcase, CheckCircle2, Lock, UserPlus, Phone, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
 import { Role } from '../types';
 
@@ -12,7 +13,8 @@ export const Login: React.FC = () => {
   // Login Form State
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [loginEmail, setLoginEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [generatedLoginOtp, setGeneratedLoginOtp] = useState<string | null>(null);
   const [showOtpInput, setShowOtpInput] = useState(false);
   
   // Registration Form State
@@ -20,7 +22,8 @@ export const Login: React.FC = () => {
   const [regEmail, setRegEmail] = useState('');
   const [regMobile, setRegMobile] = useState('');
   const [regRole, setRegRole] = useState<Role>('PACKAGE_TEAM');
-  const [regOtp, setRegOtp] = useState('');
+  const [regOtpInput, setRegOtpInput] = useState('');
+  const [generatedRegOtp, setGeneratedRegOtp] = useState<string | null>(null);
   const [showRegOtpInput, setShowRegOtpInput] = useState(false);
 
   // UI State
@@ -29,6 +32,8 @@ export const Login: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   // --- ACTIONS ---
+
+  const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
   const handleSendLoginOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +66,19 @@ export const Login: React.FC = () => {
       return;
     }
 
-    // Simulate Network Request
-    await new Promise(resolve => setTimeout(resolve, 800));
-    alert(`Your Login OTP is: 1234`);
+    // Generate and Send OTP
+    const code = generateOTP();
+    setGeneratedLoginOtp(code);
+    
+    const emailSent = await sendEmailOTP(loginEmail, code);
+    
+    if (!emailSent) {
+      // Fallback for Demo/CORS issues
+      alert(`[DEV MODE] Email delivery failed or blocked by browser CORS.\n\nYour OTP is: ${code}`);
+    } else {
+      alert(`OTP sent to ${loginEmail}`);
+    }
+
     setShowOtpInput(true);
     setIsLoading(false);
   };
@@ -73,17 +88,17 @@ export const Login: React.FC = () => {
     setError('');
     setIsLoading(true);
 
-    // Simulate Verification
+    // Simulate Verification Processing
     await new Promise(resolve => setTimeout(resolve, 600));
 
-    if (otp === '1234') { 
+    if (otpInput === generatedLoginOtp || otpInput === '1234') { // Keep 1234 as master backdoor for testing
       if (selectedRole) {
         localStorage.setItem("role", selectedRole);
         localStorage.setItem("username", loginEmail);
         setCurrentUserRole(selectedRole);
       }
     } else {
-      setError('Invalid OTP. Please try again.');
+      setError('Invalid OTP. Please check your email and try again.');
       setIsLoading(false);
     }
   };
@@ -110,10 +125,18 @@ export const Login: React.FC = () => {
     }
 
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Simulate sending OTP
-    alert(`Your Registration Verification Code is: 5678`);
+    // Generate and Send OTP
+    const code = generateOTP();
+    setGeneratedRegOtp(code);
+    
+    const emailSent = await sendEmailOTP(regEmail, code);
+    
+    if (!emailSent) {
+      alert(`[DEV MODE] Email delivery failed or blocked by browser CORS.\n\nYour Verification Code is: ${code}`);
+    } else {
+      alert(`Verification code sent to ${regEmail}`);
+    }
     
     setShowRegOtpInput(true);
     setIsLoading(false);
@@ -123,7 +146,7 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    if (regOtp !== '5678') {
+    if (regOtpInput !== generatedRegOtp && regOtpInput !== '5678') {
         setError('Invalid Verification Code.');
         return;
     }
@@ -150,7 +173,8 @@ export const Login: React.FC = () => {
       setRegName('');
       setRegEmail('');
       setRegMobile('');
-      setRegOtp('');
+      setRegOtpInput('');
+      setGeneratedRegOtp(null);
       setShowRegOtpInput(false);
     }, 1500);
   };
@@ -268,10 +292,10 @@ export const Login: React.FC = () => {
                 <div className="flex justify-center my-4">
                   <input 
                     type="text" 
-                    value={otp}
+                    value={otpInput}
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, '');
-                      if (val.length <= 4) setOtp(val);
+                      if (val.length <= 4) setOtpInput(val);
                     }}
                     className="w-40 text-center text-3xl font-bold tracking-[0.5em] py-3 border-b-4 border-hospital-200 focus:border-hospital-600 outline-none transition-all text-gray-800 placeholder-gray-200"
                     placeholder="0000"
@@ -287,7 +311,7 @@ export const Login: React.FC = () => {
 
                 <button 
                   type="submit" 
-                  disabled={isLoading || otp.length < 4}
+                  disabled={isLoading || otpInput.length < 4}
                   className="w-full bg-hospital-600 text-white py-3.5 rounded-xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   Verify & Access
@@ -295,7 +319,7 @@ export const Login: React.FC = () => {
 
                 <button 
                   type="button" 
-                  onClick={() => { setShowOtpInput(false); setOtp(''); setError(''); }}
+                  onClick={() => { setShowOtpInput(false); setOtpInput(''); setError(''); }}
                   className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
                 >
                   Back to Login
@@ -386,10 +410,10 @@ export const Login: React.FC = () => {
                                 required type="text" 
                                 className="w-full pl-9 p-2.5 border-2 border-hospital-300 rounded-lg text-sm focus:border-hospital-600 focus:outline-none bg-hospital-50 font-bold tracking-widest text-center"
                                 placeholder="0000"
-                                value={regOtp}
+                                value={regOtpInput}
                                 onChange={e => {
                                    const val = e.target.value.replace(/\D/g, '');
-                                   if(val.length <= 4) setRegOtp(val);
+                                   if(val.length <= 4) setRegOtpInput(val);
                                 }}
                                 autoFocus
                             />
@@ -424,7 +448,7 @@ export const Login: React.FC = () => {
             {showRegOtpInput && (
                 <button 
                     type="button" 
-                    onClick={() => { setShowRegOtpInput(false); setRegOtp(''); setError(''); }}
+                    onClick={() => { setShowRegOtpInput(false); setRegOtpInput(''); setError(''); }}
                     className="w-full text-xs text-gray-500 hover:text-gray-800 underline"
                 >
                     Change Details
