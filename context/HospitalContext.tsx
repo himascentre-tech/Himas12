@@ -172,7 +172,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           table: 'app_data',
           filter: `role=eq.${SHARED_DB_KEY}`,
         },
-        (payload) => {
+        (payload: any) => {
           console.log("⚡ Realtime Update Received:", payload);
           const newData = payload.new as any;
           if (newData && Array.isArray(newData.data)) {
@@ -187,7 +187,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: string) => {
         console.log("Realtime Status:", status);
       });
 
