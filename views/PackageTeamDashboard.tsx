@@ -328,9 +328,12 @@ export const PackageTeamDashboard: React.FC = () => {
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Mobile (Contact)</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                  <span className="absolute left-9 top-2.5 text-gray-500 font-bold text-sm border-r pr-2 border-gray-300 pointer-events-none select-none">
+                     +91
+                  </span>
                   <input 
-                    required type="tel" placeholder="10 Digit Number"
-                    className="w-full pl-9 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none font-mono"
+                    required type="tel" placeholder="9876543210"
+                    className="w-full pl-24 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none font-mono tracking-wide"
                     value={newStaff.mobile} 
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, '');

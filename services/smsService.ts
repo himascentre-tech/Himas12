@@ -32,8 +32,11 @@ export const sendSMSOTP = async (mobile: string, otp: string): Promise<boolean> 
 
     // 3. Delivery (For this project environment)
     // We simulate a successful 200 OK from the gateway and deliver via secure console channel.
+    // Display nicely formatted number in logs
+    const displayMobile = cleanMobile.length === 10 ? `+91 ${cleanMobile}` : mobile;
+
     console.group("%c📱 SMS Gateway Delivery", "color: #2563eb; font-weight: bold; font-size: 12px;");
-    console.log(`%cTo:      ${mobile}`, "color: #374151;");
+    console.log(`%cTo:      ${displayMobile}`, "color: #374151;");
     console.log(`%cMessage: Your Himas Hospital Verification Code is: ${otp}`, "color: #374151;");
     console.log(`%cStatus:  Sent ✅`, "color: #059669; font-weight: bold;");
     console.groupEnd();

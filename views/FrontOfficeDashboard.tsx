@@ -324,14 +324,20 @@ export const FrontOfficeDashboard: React.FC = () => {
                        <div className="space-y-6">
                          <div>
                            <label className="block text-sm font-semibold text-gray-700 mb-2">My Mobile Number:</label>
-                           <input 
-                             required 
-                             type="tel" 
-                             placeholder="10 digit mobile number"
-                             className="w-full border-b-2 border-gray-200 p-2 focus:border-hospital-500 focus:outline-none text-lg"
-                             value={formData.mobile} 
-                             onChange={e => setFormData({...formData, mobile: e.target.value})} 
-                           />
+                           <div className="relative">
+                                <span className="absolute left-0 bottom-2 text-lg text-gray-500 font-bold pointer-events-none select-none">+91</span>
+                                <input 
+                                    required 
+                                    type="tel" 
+                                    placeholder="9876543210"
+                                    className="w-full border-b-2 border-gray-200 pl-10 p-2 focus:border-hospital-500 focus:outline-none text-lg font-mono tracking-wide"
+                                    value={formData.mobile} 
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/\D/g, '');
+                                        if (val.length <= 10) setFormData({...formData, mobile: val});
+                                    }} 
+                                />
+                           </div>
                          </div>
                          <div>
                            <label className="block text-sm font-semibold text-gray-700 mb-2">My Occupation:</label>

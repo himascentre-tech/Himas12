@@ -448,9 +448,12 @@ export const Login: React.FC = () => {
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Mobile Number (For OTP)</label>
                     <div className="relative">
                         <Phone className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                        <span className="absolute left-9 top-2.5 text-gray-500 font-bold text-sm border-r pr-2 border-gray-300 pointer-events-none select-none">
+                            +91
+                        </span>
                         <input 
                             required type="tel" 
-                            className="w-full pl-9 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-hospital-500 outline-none font-mono"
+                            className="w-full pl-24 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-hospital-500 outline-none font-mono tracking-wide"
                             placeholder="9876543210"
                             value={regMobile}
                             onChange={e => {
@@ -496,7 +499,7 @@ export const Login: React.FC = () => {
                     <div className="animate-in fade-in slide-in-from-top-2 pt-4 border-t border-gray-100">
                         <div className="text-center mb-4">
                            <label className="block text-sm font-bold text-hospital-700 mb-1">Mobile Verification</label>
-                           <p className="text-xs text-gray-400">Code sent to {regMobile}</p>
+                           <p className="text-xs text-gray-400">Code sent to +91 {regMobile}</p>
                         </div>
                         <div className="relative flex justify-center">
                             <input 
