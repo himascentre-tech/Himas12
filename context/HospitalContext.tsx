@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Condition } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -36,6 +36,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
+  // Ref to track if an update came from the cloud to prevent echo-saving
+  const isRemoteUpdate = useRef(false);
+
   // Persist Role
   useEffect(() => {
     if (currentUserRole) {
@@ -56,6 +59,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     const role = localStorage.getItem("role") || currentUserRole;
     if (!role) return;
 
+    setIsLoading(true);
+    
     // 1. Try Local Backup First (Immediate UX)
     let hasLocalData = false;
     try {
@@ -66,7 +71,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           console.log("📍 Loaded data from Local Backup");
           setPatients(parsed);
           hasLocalData = true;
-          setIsDataLoaded(true); // Allow immediate editing
+          // We don't set isDataLoaded=true yet if we want to ensure cloud sync attempts first
+          // But to allow offline usage, we can set it, but keep isLoading true
         }
       }
     } catch (e) {
@@ -76,10 +82,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     // 2. Try Cloud Sync
     if (isSupabaseConfigured) {
       console.log("☁️ SYNC: Connecting to Cloud...");
-      
-      // If we don't have local data, show loading spinner. 
-      // If we DO have local data, sync in background (silent load).
-      if (!hasLocalData) setIsLoading(true);
       setSaveStatus('saving');
 
       try {
@@ -95,12 +97,17 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         
         if (data?.data) {
           console.log(`✅ SYNC: Cloud Data Received (${Array.isArray(data.data) ? data.data.length : 0} records)`);
+          
+          // Mark this as a remote update so we don't save it back immediately
+          isRemoteUpdate.current = true;
+          
           const cloudPatients = data.data as Patient[];
           setPatients(cloudPatients);
-          // Update local backup with fresh cloud data
           localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
+          
           setSaveStatus('saved');
           setLastSavedAt(new Date());
+          setIsDataLoaded(true); // Safe to enable saving now
         } else {
           console.log("ℹ️ SYNC: No Cloud Data (New DB). Initializing...");
           // If no cloud data, we try to initialize it.
@@ -116,19 +123,26 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             });
 
           if (insertError) {
-             console.warn("Could not init DB row (likely RLS)", insertError.message);
-             // Use local mode
+             console.warn("Could not init DB row (likely RLS or connection)", insertError.message);
+             // If init fails but we have local data, allow working offline
+             if (hasLocalData) setIsDataLoaded(true); 
           } else {
              setSaveStatus('saved');
+             setIsDataLoaded(true);
           }
         }
       } catch (e: any) {
         console.error("SYNC ERROR:", e.message);
         setSaveStatus('error');
-        // We gracefully fallback to local data (which is already loaded)
+        // Graceful Fallback: If we have local data, allow usage.
+        if (hasLocalData) {
+          setIsDataLoaded(true);
+        } else {
+          // Critical Failure: No Cloud, No Local. 
+          // Do NOT set isDataLoaded(true). App will show loading or error state, preventing empty overwrite.
+        }
       } finally {
         setIsLoading(false);
-        setIsDataLoaded(true);
       }
     } else {
       console.log("⚠️ SYNC: Offline/Demo Mode");
@@ -143,9 +157,56 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [currentUserRole]);
 
+  // REALTIME SUBSCRIPTION
+  useEffect(() => {
+    if (!currentUserRole || !isSupabaseConfigured) return;
+
+    console.log("🔌 Subscribing to Realtime Changes...");
+    const channel = supabase
+      .channel('app_data_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'app_data',
+          filter: `role=eq.${SHARED_DB_KEY}`,
+        },
+        (payload) => {
+          console.log("⚡ Realtime Update Received:", payload);
+          const newData = payload.new as any;
+          if (newData && Array.isArray(newData.data)) {
+             // 1. Lock saving to prevent echo
+             isRemoteUpdate.current = true;
+             // 2. Update State
+             setPatients(newData.data);
+             // 3. Update Local Backup
+             localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(newData.data));
+             setLastSavedAt(new Date(newData.updated_at));
+             setSaveStatus('saved');
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime Status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserRole]);
+
   // Save Data
   useEffect(() => {
+    // STRICT CHECK: Never save if initial load failed or is pending
     if (!isDataLoaded) return;
+
+    // CHECK LOCK: Do not save if this update came from the cloud
+    if (isRemoteUpdate.current) {
+      // Reset lock and skip
+      isRemoteUpdate.current = false;
+      return;
+    }
 
     const saveData = async () => {
       // 1. Always save to Local Backup (Safety Net)
@@ -167,7 +228,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (error) {
           console.error("Cloud Save Failed:", error.message);
           setSaveStatus('error'); 
-          // Data is safe in localStorage, so user doesn't lose work
         } else {
           setSaveStatus('saved');
           setLastSavedAt(new Date());

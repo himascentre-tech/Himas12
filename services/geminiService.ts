@@ -8,17 +8,9 @@ declare const process: {
   }
 };
 
-// Note: In a real production app, this key should be secure. 
-// For this demo, we assume the environment variable or user input is handled.
-const getClient = () => {
-  const apiKey = process.env.API_KEY || ''; 
-  // We will handle the missing key gracefully in the UI if not present
-  return new GoogleGenAI({ apiKey });
-};
-
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
-    const ai = getClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
       You are an expert medical sales counselor. Create a brief, empathetic, and effective counseling strategy (max 50 words) for this patient to help them make a decision about their treatment.
