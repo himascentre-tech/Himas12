@@ -46,7 +46,8 @@ export const Login: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
+  // Generate 6-digit OTP
+  const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
   const handleLoginCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,7 +342,7 @@ export const Login: React.FC = () => {
                   </div>
                   <h2 className="text-lg font-bold text-gray-800">Security Verification</h2>
                   <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
-                    We sent a 4-digit code to your mobile ending in <span className="font-bold text-gray-900">******{targetMobile.slice(-4)}</span>
+                    We sent a 6-digit code to your mobile ending in <span className="font-bold text-gray-900">******{targetMobile.slice(-4)}</span>
                   </p>
                 </div>
 
@@ -351,10 +352,10 @@ export const Login: React.FC = () => {
                     value={otpInput}
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, '');
-                      if (val.length <= 4) setOtpInput(val);
+                      if (val.length <= 6) setOtpInput(val);
                     }}
-                    className="w-48 text-center text-3xl font-bold tracking-[0.5em] py-3 border-b-4 border-hospital-200 focus:border-hospital-600 outline-none transition-all text-gray-800 placeholder-gray-200 font-mono"
-                    placeholder="0000"
+                    className="w-56 text-center text-3xl font-bold tracking-[0.3em] py-3 border-b-4 border-hospital-200 focus:border-hospital-600 outline-none transition-all text-gray-800 placeholder-gray-200 font-mono"
+                    placeholder="000000"
                     autoFocus
                   />
                 </div>
@@ -368,7 +369,7 @@ export const Login: React.FC = () => {
                 <div className="space-y-3">
                   <button 
                     type="submit" 
-                    disabled={isLoading || otpInput.length < 4}
+                    disabled={isLoading || otpInput.length < 6}
                     className="w-full bg-hospital-600 text-white py-3.5 rounded-xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     Confirm & Login
@@ -504,12 +505,12 @@ export const Login: React.FC = () => {
                         <div className="relative flex justify-center">
                             <input 
                                 required type="text" 
-                                className="w-40 pl-4 pr-4 p-2.5 border-2 border-hospital-300 rounded-lg text-lg focus:border-hospital-600 focus:outline-none bg-hospital-50 font-bold tracking-[0.3em] text-center font-mono"
-                                placeholder="0000"
+                                className="w-56 pl-4 pr-4 p-2.5 border-2 border-hospital-300 rounded-lg text-lg focus:border-hospital-600 focus:outline-none bg-hospital-50 font-bold tracking-[0.3em] text-center font-mono"
+                                placeholder="000000"
                                 value={regOtpInput}
                                 onChange={e => {
                                    const val = e.target.value.replace(/\D/g, '');
-                                   if(val.length <= 4) setRegOtpInput(val);
+                                   if(val.length <= 6) setRegOtpInput(val);
                                 }}
                                 autoFocus
                             />
