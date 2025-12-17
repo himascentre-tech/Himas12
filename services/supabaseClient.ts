@@ -1,42 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use environment variable first, fall back to the provided URL for convenience
+// Accessing environment variables via process.env because vite.config.ts 
+// uses 'define' to inject these specific variables at build time.
+// We add fallbacks to ensure the app works even if the environment injection fails.
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://xggnswfyegchwlplzvto.supabase.co";
-// Use provided ANON key (JWT) as fallback.
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnZ25zd2Z5ZWdjaHdscGx6dnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4Njk5MDgsImV4cCI6MjA4MTQ0NTkwOH0.rlOkk6PZHHTDzJttj3Kgb5FGiJSmOEKpkIgQT5zKeVw";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox";
 
-// Check if we have a key (URL is now guaranteed via fallback)
-export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
+// Initialize client with values or empty strings to prevent startup crash
+export const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
-let client;
-
-if (isSupabaseConfigured) {
-  try {
-    client = createClient(SUPABASE_URL, SUPABASE_KEY!);
-    console.log("Supabase Client Initialized");
-  } catch (error) {
-    console.error("Supabase client init failed:", error);
-    client = createMockClient();
-  }
-} else {
-  console.warn("Supabase credentials missing. App running in Offline/Demo mode.");
-  client = createMockClient();
-}
-
-function createMockClient() {
-  return {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: { message: 'Offline mode' } }),
-          maybeSingle: async () => ({ data: null, error: null }),
-        }),
-      }),
-      upsert: async () => ({ error: null }),
-      insert: async () => ({ select: async () => ({ data: null, error: null }) }),
-      update: async () => ({ eq: () => ({ select: async () => ({ data: null, error: null }) }) }),
-    }),
-  } as any;
-}
-
-export const supabase = client;
+// Export compatibility flag for existing components
+export const isSupabaseConfigured = true;

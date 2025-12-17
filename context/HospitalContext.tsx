@@ -61,6 +61,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       localStorage.removeItem(STORAGE_KEY_ROLE);
       localStorage.removeItem('role');
       // On logout, clear sensitive patient data but keep staff data for login validation
+      // IMPORTANT: We do NOT clear the remote DB, only local state.
       setPatients([]); 
       setIsDataLoaded(false);
     }
@@ -95,7 +96,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
              localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(data.data));
            } else if (!data) {
              // Init if empty
-             await supabase.from("app_data").insert({ role: SHARED_STAFF_KEY, data: [], updated_at: new Date().toISOString() });
+             await supabase.from("app_data").upsert({ role: SHARED_STAFF_KEY, data: [], updated_at: new Date().toISOString() });
            }
          } catch(e) { console.error("Staff sync failed", e); }
       }
@@ -143,16 +144,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           setLastSavedAt(new Date());
           setIsDataLoaded(true);
         } else {
+          // If no remote data, initialize it (potentially with local data if we have it)
           const initialData = hasLocalData ? patients : [];
           const { error: insertError } = await supabase
             .from("app_data")
-            .insert({
+            .upsert({
               role: SHARED_DB_KEY,
               data: initialData,
               updated_at: new Date().toISOString()
             });
 
           if (insertError) {
+             console.error("Initialization error:", insertError);
              if (hasLocalData) setIsDataLoaded(true); 
           } else {
              setSaveStatus('saved');
@@ -160,6 +163,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
       } catch (e: any) {
+        console.error("Load data error:", e);
         setSaveStatus('error');
         if (hasLocalData) setIsDataLoaded(true);
       } finally {
@@ -215,21 +219,31 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const saveData = async () => {
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
+      // Guard: Do not save if user logged out or supabase not configured
       if (!currentUserRole || !isSupabaseConfigured) return;
 
       setSaveStatus('saving');
       try {
+        // Use UPSERT to ensure row exists
         const { error } = await supabase
           .from("app_data")
-          .update({ data: patients, updated_at: new Date().toISOString() })
-          .eq("role", SHARED_DB_KEY);
+          .upsert({ 
+              role: SHARED_DB_KEY, 
+              data: patients, 
+              updated_at: new Date().toISOString() 
+          }, { onConflict: 'role' });
 
-        if (error) setSaveStatus('error'); 
-        else {
+        if (error) {
+            console.error("Supabase Save Error:", error);
+            setSaveStatus('error'); 
+        } else {
           setSaveStatus('saved');
           setLastSavedAt(new Date());
         }
-      } catch (e) { setSaveStatus('error'); }
+      } catch (e) { 
+          console.error("Supabase Save Exception:", e);
+          setSaveStatus('error'); 
+      }
     };
 
     const timeout = setTimeout(saveData, 1000);
@@ -250,8 +264,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       try {
         await supabase
           .from("app_data")
-          .update({ data: staffUsers, updated_at: new Date().toISOString() })
-          .eq("role", SHARED_STAFF_KEY);
+          .upsert({ 
+              role: SHARED_STAFF_KEY, 
+              data: staffUsers, 
+              updated_at: new Date().toISOString() 
+          }, { onConflict: 'role' });
       } catch (e) { console.error("Staff save failed", e); }
     };
 
