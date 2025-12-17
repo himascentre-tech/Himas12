@@ -79,6 +79,15 @@ export interface Patient {
   packageProposal?: PackageProposal;
 }
 
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string;
+  role: Role;
+  registeredAt: string;
+}
+
 export interface DashboardStats {
   totalPatients: number;
   pendingDoctor: number;

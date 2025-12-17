@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Condition } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, Gender, Condition, StaffUser } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface HospitalContextType {
   currentUserRole: Role;
   setCurrentUserRole: (role: Role) => void;
+  // Patient Data
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'registeredAt'>) => void; 
   updatePatient: (patient: Patient) => void;
@@ -12,18 +13,25 @@ interface HospitalContextType {
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => void;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => void;
   getPatientById: (id: string) => Patient | undefined;
+  // Staff Data
+  staffUsers: StaffUser[];
+  registerStaff: (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => void;
+  // System State
   saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
   lastSavedAt: Date | null;
   refreshData: () => Promise<void>;
   isLoading: boolean;
+  isStaffLoaded: boolean;
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 // Storage Keys
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
-const STORAGE_KEY_PATIENTS = 'himas_patients_local_backup_v1'; // Local Backup Key
+const STORAGE_KEY_PATIENTS = 'himas_patients_local_backup_v1';
+const STORAGE_KEY_STAFF = 'himas_staff_local_backup_v1';
 const SHARED_DB_KEY = 'HIMAS_MASTER_DATA'; 
+const SHARED_STAFF_KEY = 'HIMAS_STAFF_DATA';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUserRole, setCurrentUserRole] = useState<Role>(() => {
@@ -31,13 +39,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isStaffLoaded, setIsStaffLoaded] = useState(false);
+  
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Ref to track if an update came from the cloud to prevent echo-saving
-  const isRemoteUpdate = useRef(false);
+  // Refs to prevent echo-saving
+  const isRemoteUpdatePatients = useRef(false);
+  const isRemoteUpdateStaff = useRef(false);
 
   // Persist Role
   useEffect(() => {
@@ -47,43 +60,71 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     } else {
       localStorage.removeItem(STORAGE_KEY_ROLE);
       localStorage.removeItem('role');
-      // On logout, we might want to clear sensitive data from state, 
-      // but keeping local backup is safer for offline workflows.
+      // On logout, clear sensitive patient data but keep staff data for login validation
       setPatients([]); 
       setIsDataLoaded(false);
     }
   }, [currentUserRole]);
 
-  // Load Data: Hybrid Approach (Local First + Cloud Sync)
+  // --- LOAD STAFF DATA (Runs on Mount, Independent of Login) ---
+  useEffect(() => {
+    const loadStaffData = async () => {
+      // 1. Local Backup
+      try {
+        const localBackup = localStorage.getItem(STORAGE_KEY_STAFF);
+        if (localBackup) {
+          const parsed = JSON.parse(localBackup);
+          if (Array.isArray(parsed)) {
+            setStaffUsers(parsed);
+          }
+        }
+      } catch (e) { console.error("Local staff load error", e); }
+
+      // 2. Cloud Sync
+      if (isSupabaseConfigured) {
+         try {
+           const { data, error } = await supabase
+             .from("app_data")
+             .select("data")
+             .eq("role", SHARED_STAFF_KEY)
+             .maybeSingle();
+           
+           if (!error && data?.data) {
+             isRemoteUpdateStaff.current = true;
+             setStaffUsers(data.data);
+             localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(data.data));
+           } else if (!data) {
+             // Init if empty
+             await supabase.from("app_data").insert({ role: SHARED_STAFF_KEY, data: [], updated_at: new Date().toISOString() });
+           }
+         } catch(e) { console.error("Staff sync failed", e); }
+      }
+      setIsStaffLoaded(true);
+    };
+    loadStaffData();
+  }, []);
+
+  // --- LOAD PATIENT DATA (Dependent on Login) ---
   const loadData = async () => {
     const role = localStorage.getItem("role") || currentUserRole;
     if (!role) return;
 
     setIsLoading(true);
     
-    // 1. Try Local Backup First (Immediate UX)
     let hasLocalData = false;
     try {
       const localBackup = localStorage.getItem(STORAGE_KEY_PATIENTS);
       if (localBackup) {
         const parsed = JSON.parse(localBackup);
         if (Array.isArray(parsed)) {
-          console.log("📍 Loaded data from Local Backup");
           setPatients(parsed);
           hasLocalData = true;
-          // We don't set isDataLoaded=true yet if we want to ensure cloud sync attempts first
-          // But to allow offline usage, we can set it, but keep isLoading true
         }
       }
-    } catch (e) {
-      console.error("Local backup error:", e);
-    }
+    } catch (e) { console.error("Local backup error:", e); }
 
-    // 2. Try Cloud Sync
     if (isSupabaseConfigured) {
-      console.log("☁️ SYNC: Connecting to Cloud...");
       setSaveStatus('saving');
-
       try {
         const { data, error } = await supabase
           .from("app_data")
@@ -91,29 +132,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           .eq("role", SHARED_DB_KEY)
           .maybeSingle();
 
-        if (error) {
-          throw error;
-        } 
+        if (error) throw error;
         
         if (data?.data) {
-          console.log(`✅ SYNC: Cloud Data Received (${Array.isArray(data.data) ? data.data.length : 0} records)`);
-          
-          // Mark this as a remote update so we don't save it back immediately
-          isRemoteUpdate.current = true;
-          
+          isRemoteUpdatePatients.current = true;
           const cloudPatients = data.data as Patient[];
           setPatients(cloudPatients);
           localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(cloudPatients));
-          
           setSaveStatus('saved');
           setLastSavedAt(new Date());
-          setIsDataLoaded(true); // Safe to enable saving now
+          setIsDataLoaded(true);
         } else {
-          console.log("ℹ️ SYNC: No Cloud Data (New DB). Initializing...");
-          // If no cloud data, we try to initialize it.
-          // If we have local data, we push that. If not, empty.
           const initialData = hasLocalData ? patients : [];
-          
           const { error: insertError } = await supabase
             .from("app_data")
             .insert({
@@ -123,8 +153,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             });
 
           if (insertError) {
-             console.warn("Could not init DB row (likely RLS or connection)", insertError.message);
-             // If init fails but we have local data, allow working offline
              if (hasLocalData) setIsDataLoaded(true); 
           } else {
              setSaveStatus('saved');
@@ -132,20 +160,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
       } catch (e: any) {
-        console.error("SYNC ERROR:", e.message);
         setSaveStatus('error');
-        // Graceful Fallback: If we have local data, allow usage.
-        if (hasLocalData) {
-          setIsDataLoaded(true);
-        } else {
-          // Critical Failure: No Cloud, No Local. 
-          // Do NOT set isDataLoaded(true). App will show loading or error state, preventing empty overwrite.
-        }
+        if (hasLocalData) setIsDataLoaded(true);
       } finally {
         setIsLoading(false);
       }
     } else {
-      console.log("⚠️ SYNC: Offline/Demo Mode");
       setIsDataLoaded(true);
       setIsLoading(false);
     }
@@ -157,98 +177,93 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [currentUserRole]);
 
-  // REALTIME SUBSCRIPTION
+  // --- REALTIME SUBSCRIPTION (PATIENTS & STAFF) ---
   useEffect(() => {
-    if (!currentUserRole || !isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) return;
 
-    console.log("🔌 Subscribing to Realtime Changes...");
     const channel = supabase
-      .channel('app_data_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'app_data',
-          filter: `role=eq.${SHARED_DB_KEY}`,
-        },
-        (payload: any) => {
-          console.log("⚡ Realtime Update Received:", payload);
-          const newData = payload.new as any;
-          if (newData && Array.isArray(newData.data)) {
-             // 1. Lock saving to prevent echo
-             isRemoteUpdate.current = true;
-             // 2. Update State
-             setPatients(newData.data);
-             // 3. Update Local Backup
-             localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(newData.data));
-             setLastSavedAt(new Date(newData.updated_at));
+      .channel('global_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_data' }, (payload: any) => {
+          const rowRole = payload.new?.role;
+          const newData = payload.new?.data;
+          
+          if (rowRole === SHARED_DB_KEY && currentUserRole && Array.isArray(newData)) {
+             // Patients Update
+             isRemoteUpdatePatients.current = true;
+             setPatients(newData);
+             localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(newData));
+             setLastSavedAt(new Date(payload.new.updated_at));
              setSaveStatus('saved');
+          } else if (rowRole === SHARED_STAFF_KEY && Array.isArray(newData)) {
+             // Staff Update
+             isRemoteUpdateStaff.current = true;
+             setStaffUsers(newData);
+             localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(newData));
           }
-        }
-      )
-      .subscribe((status: string) => {
-        console.log("Realtime Status:", status);
-      });
+      })
+      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [currentUserRole]);
 
-  // Save Data
+  // --- SAVE PATIENTS ---
   useEffect(() => {
-    // STRICT CHECK: Never save if initial load failed or is pending
-    if (!isDataLoaded) return;
-
-    // CHECK LOCK: Do not save if this update came from the cloud
-    if (isRemoteUpdate.current) {
-      // Reset lock and skip
-      isRemoteUpdate.current = false;
+    if (!isDataLoaded || isRemoteUpdatePatients.current) {
+      isRemoteUpdatePatients.current = false;
       return;
     }
 
     const saveData = async () => {
-      // 1. Always save to Local Backup (Safety Net)
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
-
       if (!currentUserRole || !isSupabaseConfigured) return;
 
       setSaveStatus('saving');
-      
       try {
         const { error } = await supabase
           .from("app_data")
-          .update({
-            data: patients,
-            updated_at: new Date().toISOString()
-          })
+          .update({ data: patients, updated_at: new Date().toISOString() })
           .eq("role", SHARED_DB_KEY);
 
-        if (error) {
-          console.error("Cloud Save Failed:", error.message);
-          setSaveStatus('error'); 
-        } else {
+        if (error) setSaveStatus('error'); 
+        else {
           setSaveStatus('saved');
           setLastSavedAt(new Date());
         }
-      } catch (e) {
-        console.error("Save Exception:", e);
-        setSaveStatus('error');
-      }
+      } catch (e) { setSaveStatus('error'); }
     };
 
     const timeout = setTimeout(saveData, 1000);
     return () => clearTimeout(timeout);
-
   }, [patients, isDataLoaded, currentUserRole]);
 
+  // --- SAVE STAFF ---
+  useEffect(() => {
+    if (!isStaffLoaded || isRemoteUpdateStaff.current) {
+      isRemoteUpdateStaff.current = false;
+      return;
+    }
+
+    const saveStaff = async () => {
+      localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(staffUsers));
+      if (!isSupabaseConfigured) return;
+
+      try {
+        await supabase
+          .from("app_data")
+          .update({ data: staffUsers, updated_at: new Date().toISOString() })
+          .eq("role", SHARED_STAFF_KEY);
+      } catch (e) { console.error("Staff save failed", e); }
+    };
+
+    const timeout = setTimeout(saveStaff, 1000);
+    return () => clearTimeout(timeout);
+  }, [staffUsers, isStaffLoaded]);
+
+  // --- ACTIONS ---
+  
   const addPatient = (patientData: Omit<Patient, 'registeredAt'>) => {
-    const id = patientData.id.trim() !== '' 
-      ? patientData.id 
-      : `REG-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newPatient: Patient = { ...patientData, id, registeredAt: new Date().toISOString() };
-    setPatients(prev => [newPatient, ...prev]);
+    const id = patientData.id.trim() !== '' ? patientData.id : `REG-${Math.floor(1000 + Math.random() * 9000)}`;
+    setPatients(prev => [{ ...patientData, id, registeredAt: new Date().toISOString() }, ...prev]);
   };
 
   const updatePatient = (updatedPatient: Patient) => {
@@ -267,6 +282,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setPatients(prev => prev.map(p => p.id === patientId ? { ...p, packageProposal: proposal } : p));
   };
 
+  const registerStaff = (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
+    const newStaff: StaffUser = {
+      ...staffData,
+      id: `USR-${Date.now()}`,
+      registeredAt: new Date().toISOString()
+    };
+    setStaffUsers(prev => [...prev, newStaff]);
+  };
+
   const getPatientById = (id: string) => patients.find(p => p.id === id);
 
   return (
@@ -280,10 +304,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateDoctorAssessment,
       updatePackageProposal,
       getPatientById,
+      staffUsers,
+      registerStaff,
       saveStatus,
       lastSavedAt,
       refreshData: loadData,
-      isLoading
+      isLoading,
+      isStaffLoaded
     }}>
       {children}
     </HospitalContext.Provider>

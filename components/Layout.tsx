@@ -17,7 +17,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     switch (currentUserRole) {
       case 'FRONT_OFFICE': return 'Front Office';
       case 'DOCTOR': return 'Doctor Panel';
-      case 'PACKAGE_TEAM': return 'Package Team';
+      case 'PACKAGE_TEAM': return 'Counseling Packages';
       default: return '';
     }
   };
