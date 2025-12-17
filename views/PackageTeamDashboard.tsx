@@ -3,7 +3,7 @@ import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, StaffUser } from '../types';
-import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User } from 'lucide-react';
+import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
@@ -23,11 +23,12 @@ export const PackageTeamDashboard: React.FC = () => {
   });
 
   // --- Staff Registration State ---
-  const [newStaff, setNewStaff] = useState<{name: string, email: string, mobile: string, role: Role}>({
+  const [newStaff, setNewStaff] = useState<{name: string, email: string, mobile: string, role: Role, password: string}>({
     name: '',
     email: '',
     mobile: '',
-    role: 'FRONT_OFFICE'
+    role: 'FRONT_OFFICE',
+    password: ''
   });
   const [staffSuccess, setStaffSuccess] = useState('');
 
@@ -74,7 +75,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const handleRegisterStaff = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaff.name || !newStaff.mobile || !newStaff.role || !newStaff.email) return;
+    if (!newStaff.name || !newStaff.mobile || !newStaff.role || !newStaff.email || !newStaff.password) return;
     
     // Check duplicates
     if (staffUsers.some(u => u.mobile === newStaff.mobile || u.email.toLowerCase() === newStaff.email.toLowerCase())) {
@@ -84,7 +85,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
     registerStaff(newStaff);
     setStaffSuccess(`Successfully registered ${newStaff.name} as ${newStaff.role}`);
-    setNewStaff({ name: '', email: '', mobile: '', role: 'FRONT_OFFICE' });
+    setNewStaff({ name: '', email: '', mobile: '', role: 'FRONT_OFFICE', password: '' });
     setTimeout(() => setStaffSuccess(''), 3000);
   };
 
@@ -307,6 +308,18 @@ export const PackageTeamDashboard: React.FC = () => {
                     required type="email" placeholder="user@hospital.com"
                     className="w-full pl-9 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                     value={newStaff.email} onChange={e => setNewStaff({...newStaff, email: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Set Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                  <input 
+                    required type="password" placeholder="••••••••"
+                    className="w-full pl-9 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                    value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})}
                   />
                 </div>
               </div>

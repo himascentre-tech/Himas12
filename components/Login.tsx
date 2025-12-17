@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { sendEmailOTP } from '../services/emailService';
-import { User, ShieldCheck, Mail, ArrowRight, Activity, Briefcase, CheckCircle2, Lock, UserPlus, Phone, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
+import { sendSMSOTP } from '../services/smsService';
+import { User, ShieldCheck, Mail, ArrowRight, Activity, Briefcase, CheckCircle2, Lock, UserPlus, Phone, ArrowLeft, Loader2, KeyRound, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { Role } from '../types';
 
 export const Login: React.FC = () => {
@@ -11,17 +11,21 @@ export const Login: React.FC = () => {
   const [view, setView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
   // Login Form State
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [generatedLoginOtp, setGeneratedLoginOtp] = useState<string | null>(null);
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [identifiedRole, setIdentifiedRole] = useState<Role | null>(null);
+  const [targetMobile, setTargetMobile] = useState('');
   
   // Registration Form State
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regMobile, setRegMobile] = useState('');
   const [regRole, setRegRole] = useState<Role>('PACKAGE_TEAM');
+  const [regPassword, setRegPassword] = useState('');
   const [regOtpInput, setRegOtpInput] = useState('');
   const [generatedRegOtp, setGeneratedRegOtp] = useState<string | null>(null);
   const [showRegOtpInput, setShowRegOtpInput] = useState(false);
@@ -35,7 +39,7 @@ export const Login: React.FC = () => {
 
   const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
-  const handleSendLoginOtp = async (e: React.FormEvent) => {
+  const handleLoginCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -44,39 +48,54 @@ export const Login: React.FC = () => {
       return;
     }
 
-    if (!selectedRole) {
-      setError('Please select your department role.');
-      return;
-    }
-    if (!loginEmail.includes('@')) {
-      setError('Please enter a valid email address.');
+    if (!loginEmail || !loginPassword) {
+      setError('Please enter both email and password.');
       return;
     }
 
     setIsLoading(true);
     
     // Auth Check
-    const isFirstRun = staffUsers.length === 0;
-    const isValidUser = staffUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase() && u.role === selectedRole);
+    const user = staffUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
 
-    if (!isFirstRun && !isValidUser) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setError('Access Denied: Email not registered for this role.');
+    if (!user) {
+      await new Promise(resolve => setTimeout(resolve, 800)); // Fake delay
+      setError('Invalid credentials.');
       setIsLoading(false);
       return;
     }
 
-    // Generate and Send OTP
+    // Password Check
+    if (user.password && user.password !== loginPassword) {
+       await new Promise(resolve => setTimeout(resolve, 800));
+       setError('Invalid credentials.');
+       setIsLoading(false);
+       return;
+    }
+
+    if (!user.mobile) {
+        setError('No mobile number registered for this account. Contact Admin.');
+        setIsLoading(false);
+        return;
+    }
+
+    // Success - Set Role context for next step
+    setIdentifiedRole(user.role);
+    setTargetMobile(user.mobile);
+
+    // Generate and Send SMS OTP
     const code = generateOTP();
     setGeneratedLoginOtp(code);
     
-    const emailSent = await sendEmailOTP(loginEmail, code);
+    const smsSent = await sendSMSOTP(user.mobile, code);
     
-    if (!emailSent) {
-      // Fallback for Demo/CORS issues
-      alert(`[DEV MODE] Email delivery failed or blocked by browser CORS.\n\nYour OTP is: ${code}`);
+    if (smsSent) {
+      // In a real app, don't show the code in alert
+      alert(`OTP sent to mobile ending in ******${user.mobile.slice(-4)}`);
+      // For Demo convenience, we might log it or show it if sms fails, but let's simulate success
+      console.log("Login OTP:", code);
     } else {
-      alert(`OTP sent to ${loginEmail}`);
+      alert("Failed to send SMS. Please try again.");
     }
 
     setShowOtpInput(true);
@@ -91,14 +110,14 @@ export const Login: React.FC = () => {
     // Simulate Verification Processing
     await new Promise(resolve => setTimeout(resolve, 600));
 
-    if (otpInput === generatedLoginOtp || otpInput === '1234') { // Keep 1234 as master backdoor for testing
-      if (selectedRole) {
-        localStorage.setItem("role", selectedRole);
+    if (otpInput === generatedLoginOtp) { 
+      if (identifiedRole) {
+        localStorage.setItem("role", identifiedRole);
         localStorage.setItem("username", loginEmail);
-        setCurrentUserRole(selectedRole);
+        setCurrentUserRole(identifiedRole);
       }
     } else {
-      setError('Invalid OTP. Please check your email and try again.');
+      setError('Invalid OTP. Please check your messages and try again.');
       setIsLoading(false);
     }
   };
@@ -108,13 +127,18 @@ export const Login: React.FC = () => {
     setError('');
     setSuccessMsg('');
 
-    if (!regName || !regEmail || !regMobile || !regRole) {
+    if (!regName || !regEmail || !regMobile || !regRole || !regPassword) {
       setError('All fields are required.');
       return;
     }
 
     if (!regEmail.includes('@')) {
         setError('Please enter a valid email address.');
+        return;
+    }
+    
+    if (regMobile.length < 10) {
+        setError('Please enter a valid mobile number.');
         return;
     }
 
@@ -126,16 +150,17 @@ export const Login: React.FC = () => {
 
     setIsLoading(true);
     
-    // Generate and Send OTP
+    // Generate and Send SMS OTP
     const code = generateOTP();
     setGeneratedRegOtp(code);
     
-    const emailSent = await sendEmailOTP(regEmail, code);
+    const smsSent = await sendSMSOTP(regMobile, code);
     
-    if (!emailSent) {
-      alert(`[DEV MODE] Email delivery failed or blocked by browser CORS.\n\nYour Verification Code is: ${code}`);
+    if (smsSent) {
+      alert(`Verification code sent to mobile: ${regMobile}`);
+      console.log("Registration OTP:", code);
     } else {
-      alert(`Verification code sent to ${regEmail}`);
+      alert("Failed to send SMS.");
     }
     
     setShowRegOtpInput(true);
@@ -146,7 +171,7 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    if (regOtpInput !== generatedRegOtp && regOtpInput !== '5678') {
+    if (regOtpInput !== generatedRegOtp) {
         setError('Invalid Verification Code.');
         return;
     }
@@ -158,7 +183,8 @@ export const Login: React.FC = () => {
       name: regName,
       email: regEmail,
       mobile: regMobile,
-      role: regRole
+      role: regRole,
+      password: regPassword
     });
 
     setSuccessMsg('Registration Successful! Please login.');
@@ -167,40 +193,19 @@ export const Login: React.FC = () => {
     // Reset and Switch to Login
     setTimeout(() => {
       setLoginEmail(regEmail);
-      setSelectedRole(regRole);
+      // Automatically fill password for UX or clear it? Clearing is safer.
+      setLoginPassword(''); 
       setView('LOGIN');
       setSuccessMsg('');
       setRegName('');
       setRegEmail('');
       setRegMobile('');
+      setRegPassword('');
       setRegOtpInput('');
       setGeneratedRegOtp(null);
       setShowRegOtpInput(false);
     }, 1500);
   };
-
-  // --- COMPONENTS ---
-
-  const RoleCard = ({ role, icon: Icon, label, desc }: { role: Role, icon: any, label: string, desc: string }) => (
-    <div 
-      onClick={() => { setSelectedRole(role); setError(''); }}
-      className={`
-        cursor-pointer p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center text-center gap-1
-        ${selectedRole === role 
-          ? 'border-hospital-500 bg-hospital-50 shadow-md transform scale-105' 
-          : 'border-gray-100 bg-white hover:border-hospital-200 hover:shadow-sm'}
-      `}
-    >
-      <div className={`p-2 rounded-full ${selectedRole === role ? 'bg-hospital-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <div className={`font-bold text-sm ${selectedRole === role ? 'text-hospital-700' : 'text-gray-700'}`}>{label}</div>
-        <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{desc}</div>
-      </div>
-      {selectedRole === role && <div className="absolute top-2 right-2 text-hospital-500"><CheckCircle2 className="w-4 h-4" /></div>}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-4">
@@ -226,34 +231,52 @@ export const Login: React.FC = () => {
           /* --- LOGIN VIEW --- */
           <>
             {!showOtpInput ? (
-              <form onSubmit={handleSendLoginOtp} className="space-y-6 animate-in fade-in slide-in-from-left-4">
+              <form onSubmit={handleLoginCredentials} className="space-y-6 animate-in fade-in slide-in-from-left-4">
                 <div className="text-center">
                   <h2 className="text-lg font-bold text-gray-800">Staff Login</h2>
-                  <p className="text-xs text-gray-400">Select your role to access the dashboard</p>
+                  <p className="text-xs text-gray-400">Enter your credentials to continue</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <RoleCard role="FRONT_OFFICE" icon={User} label="Front Office" desc="Patient Reg" />
-                  <RoleCard role="DOCTOR" icon={Activity} label="Doctor" desc="Assessment" />
-                  <RoleCard role="PACKAGE_TEAM" icon={Briefcase} label="Counseling" desc="Packages & Admin" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700">Email Address</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-hospital-500 transition-colors w-5 h-5" />
-                    <input 
-                      type="email" 
-                      value={loginEmail}
-                      onChange={e => setLoginEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all"
-                      placeholder="user@himashospital.com"
-                      autoFocus
-                    />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Email (Username)</label>
+                    <div className="relative group">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-hospital-500 transition-colors w-5 h-5" />
+                        <input 
+                        type="email" 
+                        value={loginEmail}
+                        onChange={e => setLoginEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all"
+                        placeholder="user@himashospital.com"
+                        autoFocus
+                        />
+                    </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                    <div className="relative group">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-hospital-500 transition-colors w-5 h-5" />
+                        <input 
+                        type={showPassword ? "text" : "password"} 
+                        value={loginPassword}
+                        onChange={e => setLoginPassword(e.target.value)}
+                        className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all"
+                        placeholder="••••••••"
+                        />
+                        <button 
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                    </div>
+                  </div>
+
                   {staffUsers.length === 0 && (
                     <p className="text-xs text-green-600 pl-1 flex items-center gap-1 font-semibold animate-pulse">
-                      First login? Register a Package Team user first.
+                      System Reset? Register the first Admin user below.
                     </p>
                   )}
                 </div>
@@ -266,10 +289,10 @@ export const Login: React.FC = () => {
 
                 <button 
                   type="submit" 
-                  disabled={isLoading || !selectedRole || !loginEmail}
+                  disabled={isLoading || !loginEmail || !loginPassword}
                   className="w-full bg-hospital-600 text-white py-3.5 rounded-xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95"
                 >
-                  Get Login OTP <ArrowRight className="w-4 h-4" />
+                  Verify & Send OTP <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <div className="pt-4 border-t border-gray-100 text-center">
@@ -285,8 +308,11 @@ export const Login: React.FC = () => {
             ) : (
               <form onSubmit={handleVerifyLogin} className="space-y-6 animate-in fade-in slide-in-from-right-4">
                 <div className="text-center">
-                  <h2 className="text-lg font-bold text-gray-800">Verify Identity</h2>
-                  <p className="text-sm text-gray-500 mt-1">Enter code sent to {loginEmail}</p>
+                  <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                     <Smartphone className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-800">Phone Verification</h2>
+                  <p className="text-sm text-gray-500 mt-1">Enter the code sent to your mobile ending in <br/><span className="font-semibold text-gray-800">******{targetMobile.slice(-4)}</span></p>
                 </div>
 
                 <div className="flex justify-center my-4">
@@ -335,14 +361,14 @@ export const Login: React.FC = () => {
                     <ArrowLeft className="w-5 h-5 text-gray-500" />
                 </button>
                 <div>
-                    <h2 className="text-lg font-bold text-gray-800">Package Team Registration</h2>
+                    <h2 className="text-lg font-bold text-gray-800">Staff Registration</h2>
                     <p className="text-xs text-gray-400">Create new staff access</p>
                 </div>
             </div>
 
             <div className="space-y-3">
                 <div className={showRegOtpInput ? 'opacity-50 pointer-events-none' : ''}>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Full Name (Username)</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Full Name</label>
                     <div className="relative">
                         <User className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                         <input 
@@ -366,6 +392,21 @@ export const Login: React.FC = () => {
                             placeholder="john@hospital.com"
                             value={regEmail}
                             onChange={e => setRegEmail(e.target.value)}
+                            disabled={showRegOtpInput}
+                        />
+                    </div>
+                </div>
+
+                <div className={showRegOtpInput ? 'opacity-50 pointer-events-none' : ''}>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Set Password</label>
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                        <input 
+                            required type="password" 
+                            className="w-full pl-9 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-hospital-500 outline-none"
+                            placeholder="••••••••"
+                            value={regPassword}
+                            onChange={e => setRegPassword(e.target.value)}
                             disabled={showRegOtpInput}
                         />
                     </div>
@@ -403,7 +444,7 @@ export const Login: React.FC = () => {
                 {/* OTP INPUT SECTION */}
                 {showRegOtpInput && (
                     <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-gray-100">
-                        <label className="block text-sm font-bold text-hospital-700 mb-2">Enter Email Verification Code</label>
+                        <label className="block text-sm font-bold text-hospital-700 mb-2">Enter Mobile Verification Code</label>
                         <div className="relative">
                             <KeyRound className="absolute left-3 top-2.5 text-hospital-500 w-4 h-4" />
                             <input 
@@ -418,7 +459,7 @@ export const Login: React.FC = () => {
                                 autoFocus
                             />
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1 text-center">Code sent to {regEmail}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 text-center">SMS sent to {regMobile}</p>
                     </div>
                 )}
             </div>
@@ -442,7 +483,7 @@ export const Login: React.FC = () => {
                    ${showRegOtpInput ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-hospital-600 hover:bg-hospital-700 shadow-hospital-200'}
                 `}
             >
-                {isLoading ? 'Processing...' : (showRegOtpInput ? 'Verify & Register' : 'Send Verification Code')}
+                {isLoading ? 'Processing...' : (showRegOtpInput ? 'Verify & Register' : 'Send SMS Code')}
             </button>
             
             {showRegOtpInput && (

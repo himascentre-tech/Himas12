@@ -86,6 +86,7 @@ export interface StaffUser {
   mobile: string;
   role: Role;
   registeredAt: string;
+  password?: string;
 }
 
 export interface DashboardStats {
