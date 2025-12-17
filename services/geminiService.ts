@@ -1,13 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { Patient } from "../types";
 
-// Declare process to satisfy TypeScript since we don't have @types/node
-declare const process: {
-  env: {
-    API_KEY: string;
-  }
-};
-
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });

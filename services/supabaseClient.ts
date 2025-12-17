@@ -1,16 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-declare const process: {
-  env: {
-    VITE_SUPABASE_URL: string;
-    VITE_SUPABASE_ANON_KEY: string;
-  }
-};
-
 // Use environment variable first, fall back to the provided URL for convenience
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://xggnswfyegchwlplzvto.supabase.co";
 // Use provided ANON key (JWT) as fallback.
-// The previous 'sb_publishable' key was incorrect for the JS client which expects the JWT.
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnZ25zd2Z5ZWdjaHdscGx6dnRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4Njk5MDgsImV4cCI6MjA4MTQ0NTkwOH0.rlOkk6PZHHTDzJttj3Kgb5FGiJSmOEKpkIgQT5zKeVw";
 
 // Check if we have a key (URL is now guaranteed via fallback)
