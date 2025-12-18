@@ -1,15 +1,24 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, Info } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, lastErrorMessage } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [showErrorDetail, setShowErrorDetail] = React.useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem("himas_hospital_role_v1");
-    setCurrentUserRole(null);
+  const handleLogout = async () => {
+    try {
+      // 1. Clear Supabase auth session
+      await supabase.auth.signOut();
+      // 2. Clear application state
+      setCurrentUserRole(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Force clear state anyway
+      setCurrentUserRole(null);
+    }
   };
 
   const getRoleLabel = () => {
@@ -55,7 +64,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 space-y-4">
         <Loader2 className="w-12 h-12 text-hospital-600 animate-spin" />
-        <div className="text-hospital-800 font-bold text-lg animate-pulse">Syncing Database...</div>
+        <div className="text-hospital-800 font-bold text-lg animate-pulse">Synchronizing Hospital Data...</div>
       </div>
     );
   }
