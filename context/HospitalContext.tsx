@@ -62,8 +62,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) return null;
       
       const email = session.user.email || '';
       const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
@@ -74,7 +74,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       cachedHospitalId.current = id;
       return id;
     } catch (e) {
-      console.error("Session fetch failed", e);
+      console.error("Session check failed", e);
       return null;
     }
   };
@@ -101,14 +101,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const loadData = useCallback(async () => {
-    const hospitalId = await getEffectiveHospitalId();
-    if (!hospitalId) {
-      setIsLoading(false);
-      return;
-    }
-
+    // START LOAD DATA
     setSaveStatus('saving');
     try {
+      const hospitalId = await getEffectiveHospitalId();
+      if (!hospitalId) {
+        // No session or ID, can't load but must stop loading indicator
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('himas_data')
         .select('*')
@@ -136,8 +138,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setSaveStatus('error');
       
       const cached = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      if (cached) setPatients(JSON.parse(cached));
+      if (cached) {
+        try {
+          setPatients(JSON.parse(cached));
+        } catch (parseErr) {
+          console.error("Cache corrupted", parseErr);
+        }
+      }
     } finally {
+      // GUARANTEE: This is called no matter what happens in the try/catch
       setIsLoading(false);
     }
   }, []);
@@ -145,10 +154,25 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     let mounted = true;
 
+    // Fail-safe: Force stop loading after 8 seconds if Supabase hangs
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.warn("Safety trigger: Forcing loading state to false after timeout.");
+        setIsLoading(false);
+      }
+    }, 8000);
+
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
         if (!mounted) return;
+
+        if (sessionError) {
+          console.error("Supabase Session Error:", sessionError);
+          setIsLoading(false);
+          return;
+        }
 
         if (session) {
           await loadData();
@@ -179,6 +203,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [loadData]);
