@@ -26,7 +26,7 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'himas_hospital_role_session';
-const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v5';
+const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v6';
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -67,6 +67,36 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     cachedHospitalId.current = id;
     return id;
+  };
+
+  /**
+   * Safe Supabase Caller
+   * Detects missing columns (Error 42703) and retries without the offending field.
+   */
+  const performSafeUpsert = async (payload: any, isUpdate = false) => {
+    const table = 'himas_data';
+    
+    let query = isUpdate 
+      ? supabase.from(table).update(payload).eq('id', payload.id)
+      : supabase.from(table).insert(payload);
+
+    let { data, error } = await query.select().single();
+
+    // ERROR 42703: Undefined Column (The 'age' column fix)
+    if (error && error.code === '42703' && error.message.includes('age')) {
+      console.warn("Detected missing 'age' column in Supabase. Retrying without 'age' field...");
+      const { age, ...safePayload } = payload;
+      
+      let retryQuery = isUpdate
+        ? supabase.from(table).update(safePayload).eq('id', payload.id)
+        : supabase.from(table).insert(safePayload);
+      
+      const retry = await retryQuery.select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    return { data, error };
   };
 
   const loadData = useCallback(async () => {
@@ -138,14 +168,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) throw new Error("Session expired. Please log in again.");
 
-      // CRITICAL FIX: To prevent "missing age column" crash, we build the payload carefully.
-      // If the database is missing a column, Supabase returns 42703.
-      const payload: any = {
+      const payload = {
         id: patientData.id,
         name: patientData.name,
         dob: patientData.dob || null,
         gender: patientData.gender,
-        age: Number(patientData.age) || 0, // Ensure this matches your Supabase table column name
+        age: Number(patientData.age) || 0,
         mobile: patientData.mobile,
         occupation: patientData.occupation || '',
         hasInsurance: patientData.hasInsurance,
@@ -155,17 +183,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         hospital_id: hospitalId
       };
 
-      const { data, error } = await supabase
-        .from('himas_data')
-        .insert(payload)
-        .select()
-        .single();
+      const { data, error } = await performSafeUpsert(payload, false);
       
       if (error) {
-        // Handle specific Supabase error codes
-        if (error.code === '42703') {
-          throw new Error(`Database Setup Required: The 'age' column is missing from your Supabase table 'himas_data'. Please add a column named 'age' (Integer) in the Supabase Dashboard.`);
-        }
         if (error.code === '23505') {
           throw new Error(`Duplicate Entry: A patient with Registration ID "${patientData.id}" already exists.`);
         }
@@ -179,7 +199,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const msg = err.message || "Failed to synchronize with cloud database.";
       setLastErrorMessage(msg);
       setSaveStatus('error');
-      throw new Error(msg); // Bubble up to UI
+      throw new Error(msg);
     }
   };
 
@@ -189,26 +209,24 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) throw new Error("Session Lost.");
 
-      const { data, error } = await supabase
-        .from('himas_data')
-        .update({
-          name: updatedPatient.name,
-          dob: updatedPatient.dob,
-          gender: updatedPatient.gender,
-          age: Number(updatedPatient.age) || 0,
-          mobile: updatedPatient.mobile,
-          occupation: updatedPatient.occupation,
-          hasInsurance: updatedPatient.hasInsurance,
-          insuranceName: updatedPatient.insuranceName,
-          source: updatedPatient.source,
-          condition: updatedPatient.condition,
-          doctorAssessment: updatedPatient.doctorAssessment,
-          packageProposal: updatedPatient.packageProposal
-        })
-        .eq('id', updatedPatient.id)
-        .eq('hospital_id', hospitalId)
-        .select()
-        .single();
+      const payload = {
+        id: updatedPatient.id,
+        name: updatedPatient.name,
+        dob: updatedPatient.dob,
+        gender: updatedPatient.gender,
+        age: Number(updatedPatient.age) || 0,
+        mobile: updatedPatient.mobile,
+        occupation: updatedPatient.occupation,
+        hasInsurance: updatedPatient.hasInsurance,
+        insuranceName: updatedPatient.insuranceName,
+        source: updatedPatient.source,
+        condition: updatedPatient.condition,
+        doctorAssessment: updatedPatient.doctorAssessment,
+        packageProposal: updatedPatient.packageProposal,
+        hospital_id: hospitalId
+      };
+
+      const { data, error } = await performSafeUpsert(payload, true);
 
       if (error) throw error;
       setPatients(prev => prev.map(p => p.id === updatedPatient.id ? (data as Patient) : p));
