@@ -3,7 +3,6 @@ import { Patient } from "../types";
 
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
-    // Initializing Gemini API using the mandatory process.env.API_KEY parameter as per guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
@@ -12,7 +11,6 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       Patient Profile:
       - Name: ${patient.name}
       - Age: ${patient.age}
-      - Occupation: ${patient.occupation}
       - Condition: ${patient.condition}
       
       Doctor's Assessment:
@@ -21,19 +19,17 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       - Affordability: ${patient.doctorAssessment?.affordability}
       - Readiness: ${patient.doctorAssessment?.conversionReadiness}
       
-      Provide a specific conversational approach to address their likely concerns based on readiness and affordability.
+      Provide a specific conversational approach to address their likely concerns.
     `;
 
-    // Using ai.models.generateContent directly with both model name and prompt
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
-    // Directly access the .text property from the GenerateContentResponse object
-    return response.text || "Could not generate strategy.";
+    return response.text || "AI strategy generation unavailable.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "AI Strategy unavailable. Check API configuration.";
+    return "Strategic advice currently unavailable. Proceed with standard counseling.";
   }
 };

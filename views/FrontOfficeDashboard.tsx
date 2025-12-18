@@ -73,7 +73,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const validateStep1 = () => {
     if (!formData.name?.trim()) return "Name is required.";
     if (!formData.dob) return "Date of Birth is required.";
-    if (!formData.age) return "Age is required.";
+    if (!formData.age && formData.age !== 0) return "Age is required.";
     if (!formData.mobile?.trim()) return "Mobile number is required.";
     if (!formData.occupation?.trim()) return "Occupation is required.";
     if (formData.hasInsurance === 'Yes' && !formData.insuranceName?.trim()) return "Insurance Provider Name is required.";
@@ -107,7 +107,8 @@ export const FrontOfficeDashboard: React.FC = () => {
            await updatePatient({
              ...originalPatient,
              ...formData as Patient,
-             id: editingId
+             id: editingId,
+             age: parseInt(String(formData.age)) || 0
            });
          }
          setShowForm(false);
@@ -125,12 +126,19 @@ export const FrontOfficeDashboard: React.FC = () => {
           return;
         }
 
-        await addPatient(formData as any);
+        const payload = {
+            ...formData,
+            age: parseInt(String(formData.age)) || 0
+        };
+
+        await addPatient(payload as any);
         setShowForm(false);
         resetForm();
       }
     } catch (err: any) {
-      alert(`Operation Failed: ${err.message || "Unknown Error"}`);
+      const errorMsg = err.message || JSON.stringify(err);
+      console.error("Submission Failed:", errorMsg);
+      alert(`Operation Failed: ${errorMsg}\n\nPlease check your internet connection or table schema.`);
     } finally {
       setIsSubmitting(false);
     }

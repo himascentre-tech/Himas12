@@ -62,9 +62,8 @@ export interface PackageProposal {
 export interface Patient {
   id: string; // File Registration Number
   hospital_id: string; // Multi-tenancy identifier
-  // Front Office Fields
   name: string;
-  dob?: string; // Date of Birth YYYY-MM-DD
+  dob?: string; 
   gender: Gender;
   age: number;
   mobile: string;
@@ -73,9 +72,7 @@ export interface Patient {
   insuranceName?: string; 
   source: string; 
   condition: Condition;
-  created_at: string; // Renamed from registeredAt to match Supabase defaults
-  
-  // Role Specific Data
+  created_at: string; 
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
 }
@@ -88,11 +85,4 @@ export interface StaffUser {
   role: Role;
   registeredAt: string;
   password?: string;
-}
-
-export interface DashboardStats {
-  totalPatients: number;
-  pendingDoctor: number;
-  pendingPackage: number;
-  readyForSurgery: number;
 }
