@@ -19,7 +19,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
   const handleExportCSV = () => {
     let filteredPatients = [...patients];
 
-    // Filter by date if dates are selected
     if (startDate && endDate) {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
@@ -28,12 +27,11 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       end.setHours(23, 59, 59, 999);
 
       filteredPatients = patients.filter(p => {
-        const regDate = new Date(p.registeredAt);
+        const regDate = new Date(p.created_at);
         return regDate >= start && regDate <= end;
       });
     }
 
-    // Comprehensive Headers
     const headers = [
       'File Registration No', 
       'Name', 
@@ -47,7 +45,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       'Source',
       'Condition',
       'Registration Time',
-      // Doctor Data
       'Doctor Assessed', 
       'Surgeon Code', 
       'Pain Severity',
@@ -55,7 +52,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       'Readiness',
       'Surgery Date',
       'Doctor Signature',
-      // Package Data
       'Proposal Created', 
       'Decision Pattern',
       'Objection',
@@ -75,9 +71,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       p.insuranceName || 'N/A',
       p.source,
       p.condition,
-      new Date(p.registeredAt).toLocaleString(),
+      new Date(p.created_at).toLocaleString(),
       
-      // Doctor
       p.doctorAssessment ? 'Yes' : 'No',
       p.doctorAssessment?.quickCode || '',
       p.doctorAssessment?.painSeverity || '',
@@ -86,7 +81,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       p.doctorAssessment?.tentativeSurgeryDate || '',
       p.doctorAssessment?.doctorSignature || '',
 
-      // Package
       p.packageProposal ? 'Yes' : 'No',
       p.packageProposal?.decisionPattern || '',
       p.packageProposal?.objectionIdentified || '',
@@ -106,7 +100,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
     link.click();
     document.body.removeChild(link);
     
-    // Close modal if open
     setShowDateFilter(false);
   };
 

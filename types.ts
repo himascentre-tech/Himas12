@@ -73,7 +73,7 @@ export interface Patient {
   insuranceName?: string; 
   source: string; 
   condition: Condition;
-  registeredAt: string;
+  created_at: string; // Renamed from registeredAt to match Supabase defaults
   
   // Role Specific Data
   doctorAssessment?: DoctorAssessment;

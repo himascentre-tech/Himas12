@@ -3,15 +3,8 @@ import { Patient } from "../types";
 
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
-    // Safe access to API_KEY
-    const apiKey = import.meta?.env?.API_KEY || "";
-    
-    if (!apiKey) {
-      console.warn("Gemini API Key missing from environment.");
-      return "AI Strategy unavailable. Please set the API_KEY environment variable.";
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    // Initializing Gemini API using the mandatory process.env.API_KEY parameter as per guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
       You are an expert medical sales counselor. Create a brief, empathetic, and effective counseling strategy (max 50 words) for this patient to help them make a decision about their treatment.
@@ -31,11 +24,13 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       Provide a specific conversational approach to address their likely concerns based on readiness and affordability.
     `;
 
+    // Using ai.models.generateContent directly with both model name and prompt
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
+    // Directly access the .text property from the GenerateContentResponse object
     return response.text || "Could not generate strategy.";
   } catch (error) {
     console.error("Gemini API Error:", error);

@@ -10,10 +10,11 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form State
   const [formData, setFormData] = useState<Partial<Patient>>({
-    id: '', // File Registration Number
+    id: '', 
     name: '',
     dob: '',
     gender: Gender.Male,
@@ -23,7 +24,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     hasInsurance: 'No',
     insuranceName: '',
     source: '',
-    condition: Condition.Piles // Default
+    condition: Condition.Piles 
   });
 
   const resetForm = () => {
@@ -89,42 +90,49 @@ export const FrontOfficeDashboard: React.FC = () => {
     setStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    if (editingId) {
-       // In edit mode, we validate step 1 and save directly (ID is read-only)
-       const error = validateStep1();
-       if (error) {
-         alert(error);
-         return;
-       }
-       const originalPatient = patients.find(p => p.id === editingId);
-       if (originalPatient) {
-         updatePatient({
-           ...originalPatient,
-           ...formData as Patient,
-           id: editingId
-         });
-       }
-       setShowForm(false);
-       resetForm();
-    } else {
-      // In create mode, this is called from Step 2
-      if (!formData.id?.trim()) {
-        alert("File Registration Number is required.");
-        return;
-      }
-      
-      // Check for duplicate ID
-      if (patients.some(p => p.id === formData.id)) {
-        alert("This File Number already exists. Please assign a unique number.");
-        return;
-      }
+    try {
+      if (editingId) {
+         const error = validateStep1();
+         if (error) {
+           alert(error);
+           setIsSubmitting(false);
+           return;
+         }
+         const originalPatient = patients.find(p => p.id === editingId);
+         if (originalPatient) {
+           await updatePatient({
+             ...originalPatient,
+             ...formData as Patient,
+             id: editingId
+           });
+         }
+         setShowForm(false);
+         resetForm();
+      } else {
+        if (!formData.id?.trim()) {
+          alert("File Registration Number is required.");
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (patients.some(p => p.id === formData.id)) {
+          alert("This File Number already exists. Please assign a unique number.");
+          setIsSubmitting(false);
+          return;
+        }
 
-      addPatient(formData as any);
-      setShowForm(false);
-      resetForm();
+        await addPatient(formData as any);
+        setShowForm(false);
+        resetForm();
+      }
+    } catch (err: any) {
+      alert(`Operation Failed: ${err.message || "Unknown Error"}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -186,7 +194,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Bar */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-lg shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -207,10 +214,8 @@ export const FrontOfficeDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Full Screen Registration Form */}
       {showForm && (
         <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-y-auto animate-in fade-in duration-200">
-          {/* Header */}
           <div className="bg-white border-b shadow-sm sticky top-0 z-10">
             <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
               <div className="flex items-center gap-4">
@@ -225,11 +230,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{editingId ? 'Update the information below' : 'Follow the steps to register'}</p>
                 </div>
               </div>
-              <div className="flex gap-3">
-                 <button onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">
-                   Cancel
-                 </button>
-              </div>
             </div>
           </div>
           
@@ -240,20 +240,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <span className="w-8 h-8 bg-hospital-200 rounded-full flex items-center justify-center text-hospital-700">{step}</span>
                   {step === 1 ? 'Patient Demographics' : 'Assign File Number'}
                 </h3>
-                {/* Progress Indicator */}
-                {!editingId && (
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    <span className={step === 1 ? 'text-hospital-600' : ''}>Step 1</span>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className={step === 2 ? 'text-hospital-600' : ''}>Step 2</span>
-                  </div>
-                )}
               </div>
               
               <form onSubmit={handleSubmit} className="p-8 space-y-8">
                 {step === 1 && (
                   <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                     {/* Edit Mode Read-Only ID */}
                      {editingId && (
                         <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
                             <span className="text-sm font-bold text-gray-600">File Registration Number</span>
@@ -261,7 +252,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         </div>
                      )}
 
-                     {/* Personal Info */}
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div className="space-y-6">
                          <div>
@@ -390,7 +380,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                      <hr className="border-gray-100 my-8" />
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                        {/* Source */}
                         <div>
                            <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                              <Search className="w-5 h-5 text-hospital-500" />
@@ -415,7 +404,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                            </div>
                         </div>
 
-                        {/* Condition */}
                         <div>
                            <label className="block text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                              <Activity className="w-5 h-5 text-red-500" />
@@ -489,9 +477,10 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <button 
                         type="button" 
                         onClick={editingId ? handleSubmit : handleNextStep}
+                        disabled={isSubmitting}
                         className="px-8 py-3 bg-hospital-600 text-white font-bold rounded-xl hover:bg-hospital-700 shadow-xl shadow-hospital-200 transform hover:-translate-y-1 transition-all flex items-center gap-2"
                       >
-                        {editingId ? <Save className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : editingId ? <Save className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                         {editingId ? 'Update Patient' : 'Next Step'}
                       </button>
                     </>
@@ -500,9 +489,10 @@ export const FrontOfficeDashboard: React.FC = () => {
                        <button type="button" onClick={() => setStep(1)} className="px-6 py-3 text-gray-700 font-medium hover:bg-gray-100 rounded-xl">Back</button>
                        <button 
                         type="submit" 
+                        disabled={isSubmitting}
                         className="px-8 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-xl shadow-green-200 transform hover:-translate-y-1 transition-all flex items-center gap-2"
                       >
-                        <CheckCircle className="w-5 h-5" />
+                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
                         Complete Registration
                       </button>
                     </>
@@ -514,7 +504,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Patients Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-50 text-gray-500 text-sm font-medium uppercase tracking-wider">
@@ -557,7 +546,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </div>
                 </td>
                 <td className="p-4 text-right text-gray-500 text-sm">
-                  {new Date(p.registeredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </td>
                 <td className="p-4 text-center">
                   <div className="flex items-center justify-center gap-2">
@@ -585,3 +574,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     </div>
   );
 };
+
+const Loader2 = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+);

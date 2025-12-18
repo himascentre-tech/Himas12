@@ -116,7 +116,8 @@ export const DoctorDashboard: React.FC = () => {
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-400">Registered At</div>
-                <div className="font-mono text-sm">{new Date(selectedPatient.registeredAt).toLocaleTimeString()}</div>
+                {/* Fixed: Use created_at instead of registeredAt as per Patient type definition */}
+                <div className="font-mono text-sm">{new Date(selectedPatient.created_at).toLocaleTimeString()}</div>
               </div>
             </div>
             
