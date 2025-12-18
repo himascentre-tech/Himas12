@@ -4,10 +4,6 @@ import { supabase } from "../services/supabaseClient";
 import { Role } from "../types";
 import { Building2, Mail, Lock, Loader2, Stethoscope, Users, Briefcase, AlertCircle } from 'lucide-react';
 
-/**
- * Account Mapping Layer
- * Translates either the specific username or email into the Supabase email.
- */
 const ACCOUNT_MAP: Record<string, { email: string, role: Role, passHint: string }> = {
   'Himasoffice': { email: 'office@himas.com', role: 'FRONT_OFFICE', passHint: 'Himas1984@' },
   'office@himas.com': { email: 'office@himas.com', role: 'FRONT_OFFICE', passHint: 'Himas1984@' },
@@ -31,35 +27,39 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     const input = identifier.trim();
-    
-    // 1. Check if the provided Email/ID exists in our authorized map
     const account = ACCOUNT_MAP[input];
 
     if (!account) {
-      setError("Invalid username");
+      setError("Unknown Staff Identity");
       setIsLoading(false);
       return;
     }
 
     try {
-      // 2. Perform Supabase Auth
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      // Safety timeout for auth call
+      const authPromise = supabase.auth.signInWithPassword({
         email: account.email,
         password,
       });
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Login timed out. Check your internet.")), 10000)
+      );
+
+      const result: any = await Promise.race([authPromise, timeoutPromise]);
+      const { error: authError } = result;
+
       if (authError) {
         if (authError.message.toLowerCase().includes("invalid login credentials")) {
-          throw new Error("Invalid password. Please try again.");
+          throw new Error("Access Denied: Incorrect password.");
         }
         throw authError;
       }
 
-      // 3. Success: Set the application state for the specific role
       setCurrentUserRole(account.role);
     } catch (err: any) {
-      console.error("Login attempt failed:", err.message);
-      setError(err.message || "An unexpected error occurred.");
+      console.error("Login Error:", err.message);
+      setError(err.message || "Failed to reach security server.");
     } finally {
       setIsLoading(false);
     }
@@ -80,11 +80,11 @@ export const Login: React.FC = () => {
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-hospital-600" />
         
-        <h2 className="text-xl font-bold text-slate-800 mb-6 text-center text-sm uppercase tracking-widest">Staff Portal</h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-6 text-center text-sm uppercase tracking-widest text-slate-400">Staff Portal Access</h2>
         
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">User Email / ID</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
@@ -99,7 +99,7 @@ export const Login: React.FC = () => {
           </div>
 
           <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Security Password</label>
              <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
@@ -124,20 +124,20 @@ export const Login: React.FC = () => {
             disabled={isLoading}
             className="w-full bg-hospital-700 hover:bg-hospital-800 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-hospital-200 disabled:opacity-70 flex items-center justify-center gap-2"
           >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enter System'}
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between">
-           <div className="flex flex-col items-center gap-1 group cursor-help" title="ID: Himasoffice | Pass: Himas1984@">
+           <div className="flex flex-col items-center gap-1 group cursor-help" title="Himasoffice / Himas1984@">
              <Users className="w-4 h-4 text-slate-300 group-hover:text-hospital-500 transition-colors" />
              <span className="text-[10px] font-bold text-slate-400 uppercase">Office</span>
            </div>
-           <div className="flex flex-col items-center gap-1 group cursor-help" title="ID: DoctorHimas | Pass: Doctor8419@">
+           <div className="flex flex-col items-center gap-1 group cursor-help" title="DoctorHimas / Doctor8419@">
              <Stethoscope className="w-4 h-4 text-slate-300 group-hover:text-hospital-500 transition-colors" />
              <span className="text-[10px] font-bold text-slate-400 uppercase">Doctor</span>
            </div>
-           <div className="flex flex-col items-center gap-1 group cursor-help" title="ID: Team1984 | Pass: Team8131@">
+           <div className="flex flex-col items-center gap-1 group cursor-help" title="Team1984 / Team8131@">
              <Briefcase className="w-4 h-4 text-slate-300 group-hover:text-hospital-500 transition-colors" />
              <span className="text-[10px] font-bold text-slate-400 uppercase">Packages</span>
            </div>
@@ -145,7 +145,7 @@ export const Login: React.FC = () => {
       </div>
       
       <p className="mt-8 text-xs text-slate-400 font-medium">
-        Himas Hospital MIS © 2024 • Production Secure
+        Himas Hospital MIS © 2024 • production-ready-node
       </p>
     </div>
   );

@@ -27,7 +27,7 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'himas_hospital_role_session';
-const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v10';
+const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v11';
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -47,6 +47,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
   const cachedHospitalId = useRef<string | null>(null);
+  const loadingAbortController = useRef<AbortController | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
     if (role) {
@@ -64,7 +65,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // Timeout the session check if it hangs
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth Check Timeout")), 5000));
+      
+      const { data: { session }, error }: any = await Promise.race([sessionPromise, timeoutPromise]);
+      
       if (error || !session?.user) return null;
       
       const email = session.user.email || '';
@@ -82,28 +88,36 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const performSafeUpsert = async (payload: any, isUpdate = false) => {
     const table = 'himas_data';
-    let query = isUpdate 
-      ? supabase.from(table).update(payload).eq('id', payload.id)
-      : supabase.from(table).insert(payload);
+    
+    // Add a race condition to prevent Supabase from hanging the whole UI
+    const dbCall = isUpdate 
+      ? supabase.from(table).update(payload).eq('id', payload.id).select().single()
+      : supabase.from(table).insert(payload).select().single();
 
-    let { data, error } = await query.select().single();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Database request timed out. Please check your internet or Supabase status.")), 8000)
+    );
 
-    // Fallback if age column is still missing (just in case)
+    let result: any = await Promise.race([dbCall, timeoutPromise]);
+    let { data, error } = result;
+
     if (error && error.code === '42703' && /column "?age"?/i.test(error.message)) {
       const { age, ...safePayload } = payload;
       let retryQuery = isUpdate
-        ? supabase.from(table).update(safePayload).eq('id', payload.id)
-        : supabase.from(table).insert(safePayload);
+        ? supabase.from(table).update(safePayload).eq('id', payload.id).select().single()
+        : supabase.from(table).insert(safePayload).select().single();
       
-      const retry = await retryQuery.select().single();
-      data = retry.data;
-      error = retry.error;
+      const retryResult: any = await Promise.race([retryQuery, timeoutPromise]);
+      data = retryResult.data;
+      error = retryResult.error;
     }
     return { data, error };
   };
 
   const loadData = useCallback(async () => {
     setSaveStatus('saving');
+    setIsLoading(true);
+
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) {
@@ -112,10 +126,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      const { data, error } = await supabase
+      // Add a timeout to the fetch query
+      const fetchPromise = supabase
         .from('himas_data')
         .select('*')
         .eq('hospital_id', hospitalId);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Fetch Timeout")), 7000)
+      );
+
+      const result: any = await Promise.race([fetchPromise, timeoutPromise]);
+      const { data, error } = result;
 
       if (error) {
         console.error("Supabase load error:", error);
@@ -146,6 +168,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         try { setPatients(JSON.parse(cached)); } catch(err) {}
       }
     } finally {
+      // Guaranteed resolution of loading state
       setIsLoading(false);
     }
   }, []);
@@ -155,10 +178,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const hospitalId = await getEffectiveHospitalId();
         if (!mounted) return;
 
-        if (session) {
+        if (hospitalId) {
           await loadData();
         } else {
           setIsLoading(false);
@@ -193,22 +216,32 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) throw new Error("Session expired.");
+      if (!hospitalId) throw new Error("Session expired. Please log in again.");
 
       const payload = {
-        ...patientData,
+        id: patientData.id,
+        name: patientData.name,
+        dob: patientData.dob || null,
+        gender: patientData.gender,
         age: Number(patientData.age) || 0,
+        mobile: patientData.mobile,
+        occupation: patientData.occupation || '',
+        hasInsurance: patientData.hasInsurance,
+        insuranceName: patientData.insuranceName || null,
+        source: patientData.source || '',
+        condition: patientData.condition,
         hospital_id: hospitalId
       };
 
       const { data, error } = await performSafeUpsert(payload, false);
       if (error) {
-        if (error.code === '42P01') throw new Error("Table 'himas_data' not found on Supabase. Did you run the SQL script?");
-        if (error.code === '23505') throw new Error(`Patient ID "${patientData.id}" already exists.`);
+        if (error.code === '42P01') throw new Error("Table 'himas_data' not found. Please ensure the SQL script was run on Supabase.");
+        if (error.code === '23505') throw new Error(`Patient ID "${patientData.id}" is already registered.`);
         throw error;
       }
       setPatients(prev => [data as Patient, ...prev]);
       setSaveStatus('saved');
+      setLastErrorMessage(null);
     } catch (err: any) {
       setLastErrorMessage(err.message);
       setSaveStatus('error');
@@ -225,6 +258,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (error) throw error;
       setPatients(prev => prev.map(p => p.id === updatedPatient.id ? (data as Patient) : p));
       setSaveStatus('saved');
+      setLastErrorMessage(null);
     } catch (err: any) {
       setLastErrorMessage(err.message);
       setSaveStatus('error');

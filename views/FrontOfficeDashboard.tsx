@@ -55,13 +55,26 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     clearError();
 
-    // Check for duplicate ID locally first to reduce DB noise
-    if (!editingId && patients.some(p => p.id.toLowerCase() === formData.id?.toLowerCase())) {
-      setLocalError(`Patient File ID "${formData.id}" is already registered. Please check or use a different ID.`);
+    // Local validation for ID
+    if (!editingId && (!formData.id || formData.id.trim().length === 0)) {
+        setLocalError("Please provide a File Registration ID.");
+        return;
+    }
+
+    // Check for duplicate ID locally
+    if (!editingId && patients.some(p => p.id.toLowerCase() === formData.id?.trim().toLowerCase())) {
+      setLocalError(`Patient File ID "${formData.id}" is already registered.`);
       return;
     }
 
     setIsSubmitting(true);
+    
+    // Safety timeout to reset UI if DB hangs
+    const submissionTimeout = setTimeout(() => {
+        setIsSubmitting(false);
+        setLocalError("Database is taking too long to respond. Please check your connection.");
+    }, 10000);
+
     try {
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
@@ -69,17 +82,17 @@ export const FrontOfficeDashboard: React.FC = () => {
           await updatePatient({ ...original, ...formData as Patient });
         }
       } else {
-        await addPatient(formData as any);
+        await addPatient({ ...formData, id: formData.id?.trim().toUpperCase() } as any);
       }
-      // Success path
+      
+      clearTimeout(submissionTimeout);
       setShowForm(false);
       resetForm();
     } catch (err: any) {
-      console.error("Critical submission failure:", err);
-      // The error message from HospitalContext will bubble up here
-      setLocalError(err.message || "A network or database error occurred. Data was not saved.");
+      clearTimeout(submissionTimeout);
+      console.error("Submission failed:", err);
+      setLocalError(err.message || "A database error occurred. Entry not saved.");
     } finally {
-      // CRITICAL: This MUST run to prevent the "Only Loading" hang
       setIsSubmitting(false);
     }
   };
@@ -321,22 +334,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <div className="p-6 bg-red-50 border border-red-200 rounded-3xl flex flex-col gap-3 text-red-700 animate-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center gap-2 font-bold">
                       <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                      {localError?.includes("Setup Required") ? "Database Setup Needed" : "Unable to Save Data"}
+                      Database Sync Warning
                     </div>
                     <p className="text-sm font-medium opacity-90 leading-relaxed">
                       {localError || lastErrorMessage}
                     </p>
-                    {(localError?.includes("age") || lastErrorMessage?.includes("age")) && (
-                      <div className="mt-2 p-3 bg-white/50 border border-red-200 rounded-xl text-xs font-mono">
-                        <div className="font-bold mb-1 flex items-center gap-1 uppercase tracking-tighter">
-                          <Database className="w-3 h-3" /> Technical Fix Instructions:
-                        </div>
-                        1. Open Supabase Dashboard<br/>
-                        2. Go to Table Editor &rarr; 'himas_data'<br/>
-                        3. Add column 'age' | Type: int4<br/>
-                        4. Click Save
-                      </div>
-                    )}
                   </div>
                 )}
 
