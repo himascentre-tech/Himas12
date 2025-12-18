@@ -1,26 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Robust environment variable retrieval.
- * Uses optional chaining on import.meta.env to prevent "Cannot read properties of undefined" 
- * errors in environments where Vite has not yet injected the env object.
+ * Robust environment variable retrieval for Supabase.
+ * We prioritize environment variables but fall back to the provided project credentials
+ * to ensure the app never crashes due to missing configuration.
  */
-const getEnvVar = (key: string, fallback: string): string => {
-  try {
-    // Safely access import.meta.env using optional chaining
-    const value = import.meta?.env?.[key];
-    return typeof value === 'string' && value.length > 0 ? value : fallback;
-  } catch (e) {
-    return fallback;
-  }
-};
+const SUPABASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) 
+  ? import.meta.env.VITE_SUPABASE_URL 
+  : 'https://xggnswfyegchwlplzvto.supabase.co';
 
-// Values provided by the user for this specific project
-const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL', 'https://xggnswfyegchwlplzvto.supabase.co');
-const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY', 'sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox');
+const SUPABASE_ANON_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) 
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY 
+  : 'sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox';
+
+// Validate that we have strings before creating the client to avoid TypeErrors
+if (!SUPABASE_URL || typeof SUPABASE_URL !== 'string') {
+  throw new Error("Supabase URL is missing or invalid. Check your environment variables.");
+}
+
+if (!SUPABASE_ANON_KEY || typeof SUPABASE_ANON_KEY !== 'string') {
+  throw new Error("Supabase Anon Key is missing or invalid. Check your environment variables.");
+}
 
 /**
  * Singleton Supabase client.
- * Guaranteed non-nullable and initialized with valid strings.
+ * Initialized with validated URL and Key strings.
  */
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

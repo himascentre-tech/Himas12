@@ -26,7 +26,7 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'himas_hospital_role_session';
-const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v6';
+const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v7';
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -71,7 +71,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   /**
    * Safe Supabase Caller
-   * Detects missing columns (Error 42703) and retries without the offending field.
+   * Detects missing columns (Error 42703) and retries without offending fields.
+   * Specifically handles the "age" column schema mismatch.
    */
   const performSafeUpsert = async (payload: any, isUpdate = false) => {
     const table = 'himas_data';
@@ -82,9 +83,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     let { data, error } = await query.select().single();
 
-    // ERROR 42703: Undefined Column (The 'age' column fix)
-    if (error && error.code === '42703' && error.message.includes('age')) {
-      console.warn("Detected missing 'age' column in Supabase. Retrying without 'age' field...");
+    // ERROR 42703: Undefined Column
+    // Use a more robust check for the column name "age" in the error message
+    if (error && error.code === '42703' && /column "?age"?/i.test(error.message)) {
+      console.warn("Retrying without 'age' column due to database schema mismatch...");
       const { age, ...safePayload } = payload;
       
       let retryQuery = isUpdate
@@ -115,7 +117,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (error) throw error;
       
-      const sortedData = (data || []).sort((a, b) => {
+      const sortedData = (data || []).map(item => ({
+        ...item,
+        age: item.age ?? 0 // Default age if missing from schema
+      })).sort((a, b) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
         return dateB - dateA; 
