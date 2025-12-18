@@ -5,7 +5,6 @@ import { supabase } from '../services/supabaseClient';
 interface HospitalContextType {
   currentUserRole: Role;
   setCurrentUserRole: (role: Role) => void;
-  // Patient Data
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => Promise<void>; 
   updatePatient: (patient: Patient) => Promise<void>;
@@ -13,10 +12,8 @@ interface HospitalContextType {
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
   getPatientById: (id: string) => Patient | undefined;
-  // Staff Data
   staffUsers: StaffUser[];
-  registerStaff: (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => void;
-  // System State
+  registerStaff: (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => Promise<void>;
   saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
   lastSavedAt: Date | null;
   refreshData: () => Promise<void>;
@@ -36,14 +33,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [isStaffLoaded, setIsStaffLoaded] = useState(false);
-  
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Persist role selection
   useEffect(() => {
     if (currentUserRole) {
       localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
@@ -53,7 +47,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [currentUserRole]);
 
-  // Load staff data (Shared lookup)
   useEffect(() => {
     const loadStaffData = async () => {
       try {
@@ -73,7 +66,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     loadStaffData();
   }, []);
 
-  // --- SELECT DATA (SCOPED BY HOSPITAL_ID) ---
   const loadData = async () => {
     if (!currentUserRole) return;
     setIsLoading(true);
@@ -92,7 +84,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           .order('registeredAt', { ascending: false });
 
         if (error) throw error;
-        
         if (data) {
           setPatients(data as Patient[]);
           setSaveStatus('saved');
@@ -115,7 +106,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [currentUserRole]);
 
-  // Real-time synchronization (Scoped to current hospital)
   useEffect(() => {
     if (!currentUserRole) return;
 
@@ -151,13 +141,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [currentUserRole]);
 
-  // --- INSERT PATIENT (INJECT HOSPITAL_ID) ---
   const addPatient = async (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => {
     setSaveStatus('saving');
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const hospitalId = user?.user_metadata?.hospital_id;
-
       if (!hospitalId) throw new Error("Permission Denied: No Hospital ID.");
 
       const { error } = await supabase
@@ -177,13 +165,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  // --- UPDATE PATIENT (SCOPED BY HOSPITAL_ID) ---
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const hospitalId = user?.user_metadata?.hospital_id;
-
       if (!hospitalId) throw new Error("Permission Denied: No Hospital ID.");
 
       const { error } = await supabase
@@ -200,13 +186,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  // --- DELETE PATIENT (SCOPED BY HOSPITAL_ID) ---
   const deletePatient = async (id: string) => {
     setSaveStatus('saving');
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const hospitalId = user?.user_metadata?.hospital_id;
-
       if (!hospitalId) throw new Error("Permission Denied: No Hospital ID.");
 
       const { error } = await supabase
@@ -237,13 +221,22 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const registerStaff = (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
+  const registerStaff = async (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
     const newStaff: StaffUser = {
       ...staffData,
       id: `USR-${Date.now()}`,
       registeredAt: new Date().toISOString()
     };
-    setStaffUsers(prev => [...prev, newStaff]);
+    const updatedStaff = [...staffUsers, newStaff];
+    setStaffUsers(updatedStaff);
+    
+    try {
+      await supabase
+        .from("app_data")
+        .upsert({ role: SHARED_STAFF_KEY, data: updatedStaff });
+    } catch (e) {
+      console.error("Failed to persist staff directory", e);
+    }
   };
 
   const getPatientById = (id: string) => patients.find(p => p.id === id);

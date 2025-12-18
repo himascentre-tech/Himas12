@@ -7,8 +7,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem("role");
-    localStorage.removeItem("username");
+    localStorage.removeItem("himas_hospital_role_v1");
     setCurrentUserRole(null);
   };
 
@@ -34,13 +33,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     if (saveStatus === 'saving') return <span className="flex items-center gap-1 text-blue-400 text-xs animate-pulse"><Loader2 className="w-3 h-3 animate-spin"/> Syncing...</span>;
     if (saveStatus === 'saved') return <span className="flex items-center gap-1 text-green-400 text-xs"><Check className="w-3 h-3"/> Saved</span>;
     if (saveStatus === 'error') return <span onClick={() => refreshData()} className="flex items-center gap-1 text-red-400 text-xs cursor-pointer"><AlertCircle className="w-3 h-3"/> Failed (Retry)</span>;
-    return <span className="flex items-center gap-1 text-gray-500 text-xs"><Cloud className="w-3 h-3"/> Offline</span>;
+    return <span className="flex items-center gap-1 text-gray-500 text-xs"><Cloud className="w-3 h-3"/> Connected</span>;
   };
 
   const LOGO_URL_DARK = "https://placehold.co/400x120/0f172a/ffffff?text=HiMAS"; 
   const LOGO_URL_LIGHT = "https://placehold.co/400x120/ffffff/0284c7?text=HiMAS"; 
 
-  // Loading Overlay
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 space-y-4">
@@ -53,7 +51,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
         <img src={LOGO_URL_LIGHT} alt="Himas Hospital" className="h-8 w-auto"/>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
@@ -61,7 +58,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </button>
       </div>
 
-      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-10 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out
         md:relative md:translate-x-0
@@ -101,15 +97,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto h-screen relative">
-        {saveStatus === 'error' && (
-          <div className="bg-red-500 text-white text-xs font-bold text-center py-2 px-4 shadow-md flex items-center justify-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            CONNECTION ERROR: Data is not syncing. Check internet and click Sync Data.
-          </div>
-        )}
-
         <div className="p-6 max-w-7xl mx-auto">
           {children}
         </div>
