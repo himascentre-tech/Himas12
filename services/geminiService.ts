@@ -3,8 +3,13 @@ import { Patient } from "../types";
 
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
-    const apiKey = import.meta.env.API_KEY;
-    if (!apiKey) throw new Error("Missing Gemini API Key in import.meta.env.");
+    // Safe access to API_KEY
+    const apiKey = import.meta?.env?.API_KEY || "";
+    
+    if (!apiKey) {
+      console.warn("Gemini API Key missing from environment.");
+      return "AI Strategy unavailable. Please set the API_KEY environment variable.";
+    }
 
     const ai = new GoogleGenAI({ apiKey });
     
@@ -34,6 +39,6 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
     return response.text || "Could not generate strategy.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "AI Strategy unavailable. Please ensure API Key is set correctly in environment.";
+    return "AI Strategy unavailable. Check API configuration.";
   }
 };

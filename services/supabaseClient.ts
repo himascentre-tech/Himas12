@@ -1,22 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Access environment variables via import.meta.env (Vite standard).
- * These are injected at build time by Vite.
+ * Robust environment variable retrieval.
+ * Uses optional chaining on import.meta.env to prevent "Cannot read properties of undefined" 
+ * errors in environments where Vite has not yet injected the env object.
  */
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const getEnvVar = (key: string, fallback: string): string => {
+  try {
+    // Safely access import.meta.env using optional chaining
+    const value = import.meta?.env?.[key];
+    return typeof value === 'string' && value.length > 0 ? value : fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
 
-// Fail-fast if variables are missing to prevent runtime null errors
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'CRITICAL: Supabase environment variables are missing. ' +
-    'Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.'
-  );
-}
+// Values provided by the user for this specific project
+const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL', 'https://xggnswfyegchwlplzvto.supabase.co');
+const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY', 'sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox');
 
 /**
- * Singleton Supabase Client.
- * Guaranteed to be non-nullable and correctly configured.
+ * Singleton Supabase client.
+ * Guaranteed non-nullable and initialized with valid strings.
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
