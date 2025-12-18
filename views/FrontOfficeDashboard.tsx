@@ -332,7 +332,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                           <Database className="w-3 h-3" /> Technical Fix Instructions:
                         </div>
                         1. Open Supabase Dashboard<br/>
-                        2. Go to Table Editor -> 'himas_data'<br/>
+                        2. Go to Table Editor &rarr; 'himas_data'<br/>
                         3. Add column 'age' | Type: int4<br/>
                         4. Click Save
                       </div>
