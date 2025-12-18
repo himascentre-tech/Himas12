@@ -1,6 +1,6 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading } = useHospital();
@@ -32,7 +32,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const CloudStatus = () => {
     if (saveStatus === 'saving') return <span className="flex items-center gap-1 text-blue-400 text-xs animate-pulse"><Loader2 className="w-3 h-3 animate-spin"/> Syncing...</span>;
     if (saveStatus === 'saved') return <span className="flex items-center gap-1 text-green-400 text-xs"><Check className="w-3 h-3"/> Saved</span>;
-    if (saveStatus === 'error') return <span onClick={() => refreshData()} className="flex items-center gap-1 text-red-400 text-xs cursor-pointer"><AlertCircle className="w-3 h-3"/> Failed (Retry)</span>;
+    if (saveStatus === 'error') return <span onClick={() => refreshData()} className="flex items-center gap-1 text-red-400 text-xs cursor-pointer hover:underline"><AlertCircle className="w-3 h-3"/> Failed (Retry)</span>;
     return <span className="flex items-center gap-1 text-gray-500 text-xs"><Cloud className="w-3 h-3"/> Connected</span>;
   };
 
@@ -83,9 +83,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <nav className="space-y-2">
             <button className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800 text-white rounded-lg transition-colors">
               <FileText className="w-5 h-5" /> Dashboard
-            </button>
-            <button onClick={() => refreshData()} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-              <RefreshCw className="w-5 h-5" /> Sync Data
             </button>
           </nav>
         </div>
