@@ -72,8 +72,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     // Safety timeout to reset UI if DB hangs
     const submissionTimeout = setTimeout(() => {
         setIsSubmitting(false);
-        setLocalError("Database is taking too long to respond. Please check your connection.");
-    }, 10000);
+        setLocalError("Submission is taking too long. Check your network.");
+    }, 12000);
 
     try {
       if (editingId) {
@@ -90,8 +90,13 @@ export const FrontOfficeDashboard: React.FC = () => {
       resetForm();
     } catch (err: any) {
       clearTimeout(submissionTimeout);
-      console.error("Submission failed:", err);
-      setLocalError(err.message || "A database error occurred. Entry not saved.");
+      // Clean up the error message to avoid [object Object]
+      const errorMessage = err instanceof Error ? err.message : 
+                          (typeof err === 'string' ? err : 
+                          (err && typeof err === 'object' && err.message ? err.message : "Database Error: Request failed."));
+      
+      console.error("Submission failed details:", err);
+      setLocalError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -334,7 +339,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <div className="p-6 bg-red-50 border border-red-200 rounded-3xl flex flex-col gap-3 text-red-700 animate-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center gap-2 font-bold">
                       <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                      Database Sync Warning
+                      Status: {localError ? 'Local Error' : 'Sync Error'}
                     </div>
                     <p className="text-sm font-medium opacity-90 leading-relaxed">
                       {localError || lastErrorMessage}
@@ -354,7 +359,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Saving...</span>
+                        <span>Processing...</span>
                       </>
                     ) : (
                       <>

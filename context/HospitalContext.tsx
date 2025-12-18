@@ -27,7 +27,7 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'himas_hospital_role_session';
-const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v11';
+const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v12';
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -47,7 +47,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
   const cachedHospitalId = useRef<string | null>(null);
-  const loadingAbortController = useRef<AbortController | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
     if (role) {
@@ -65,13 +64,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
-      // Timeout the session check if it hangs
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth Check Timeout")), 5000));
-      
-      const { data: { session }, error }: any = await Promise.race([sessionPromise, timeoutPromise]);
-      
-      if (error || !session?.user) return null;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
       
       const email = session.user.email || '';
       const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
@@ -88,19 +82,30 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const performSafeUpsert = async (payload: any, isUpdate = false) => {
     const table = 'himas_data';
-    
-    // Add a race condition to prevent Supabase from hanging the whole UI
     const dbCall = isUpdate 
       ? supabase.from(table).update(payload).eq('id', payload.id).select().single()
       : supabase.from(table).insert(payload).select().single();
 
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Database request timed out. Please check your internet or Supabase status.")), 8000)
+      setTimeout(() => reject(new Error("Database connection timed out.")), 10000)
     );
 
-    let result: any = await Promise.race([dbCall, timeoutPromise]);
+    let result: any;
+    try {
+      result = await Promise.race([dbCall, timeoutPromise]);
+    } catch (e: any) {
+      return { data: null, error: e };
+    }
+
     let { data, error } = result;
 
+    // Specific fix for UUID vs String mismatch
+    if (error && error.code === '22P02' && error.message.includes('uuid')) {
+      const fixMsg = "DATABASE CONFLICT: Your 'id' column is set to UUID but you are using text IDs like 'HIMAS-234'. Please run the SQL fix in your Supabase editor: ALTER TABLE himas_data ALTER COLUMN id TYPE TEXT;";
+      return { data: null, error: { ...error, message: fixMsg } };
+    }
+
+    // Fallback for missing columns
     if (error && error.code === '42703' && /column "?age"?/i.test(error.message)) {
       const { age, ...safePayload } = payload;
       let retryQuery = isUpdate
@@ -111,6 +116,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       data = retryResult.data;
       error = retryResult.error;
     }
+
     return { data, error };
   };
 
@@ -126,23 +132,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      // Add a timeout to the fetch query
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('himas_data')
         .select('*')
         .eq('hospital_id', hospitalId);
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Fetch Timeout")), 7000)
-      );
 
-      const result: any = await Promise.race([fetchPromise, timeoutPromise]);
-      const { data, error } = result;
-
-      if (error) {
-        console.error("Supabase load error:", error);
-        throw error;
-      }
+      if (error) throw error;
       
       const sortedData = (data || []).map(item => ({
         ...item,
@@ -156,70 +151,51 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setPatients(sortedData);
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(sortedData));
       setSaveStatus('saved');
-      setLastSavedAt(new Date());
       setLastErrorMessage(null);
     } catch (e: any) {
-      console.error("Load sequence failure:", e);
-      setLastErrorMessage(e.message || "Failed to load cloud data.");
+      setLastErrorMessage(e.message || "Database load error.");
       setSaveStatus('error');
-      
       const cached = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      if (cached) {
-        try { setPatients(JSON.parse(cached)); } catch(err) {}
-      }
+      if (cached) try { setPatients(JSON.parse(cached)); } catch(err) {}
     } finally {
-      // Guaranteed resolution of loading state
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     const init = async () => {
       try {
         const hospitalId = await getEffectiveHospitalId();
-        if (!mounted) return;
-
-        if (hospitalId) {
-          await loadData();
-        } else {
-          setIsLoading(false);
+        if (mounted) {
+          if (hospitalId) await loadData();
+          else setIsLoading(false);
         }
       } catch (err) {
         if (mounted) setIsLoading(false);
       }
     };
-
     init();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN') {
-        cachedHospitalId.current = null;
-        await loadData();
-      } else if (event === 'SIGNED_OUT') {
-        cachedHospitalId.current = null;
+      if (event === 'SIGNED_IN') await loadData();
+      else if (event === 'SIGNED_OUT') {
         setPatients([]);
         setCurrentUserRole(null);
         setIsLoading(false);
       }
     });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [loadData]);
 
   const addPatient = async (patientData: Omit<Patient, 'created_at' | 'hospital_id'>) => {
     setSaveStatus('saving');
     try {
       const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) throw new Error("Session expired. Please log in again.");
+      if (!hospitalId) throw new Error("Auth session expired.");
 
       const payload = {
-        id: patientData.id,
+        id: String(patientData.id).trim().toUpperCase(),
         name: patientData.name,
         dob: patientData.dob || null,
         gender: patientData.gender,
@@ -234,11 +210,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
 
       const { data, error } = await performSafeUpsert(payload, false);
-      if (error) {
-        if (error.code === '42P01') throw new Error("Table 'himas_data' not found. Please ensure the SQL script was run on Supabase.");
-        if (error.code === '23505') throw new Error(`Patient ID "${patientData.id}" is already registered.`);
-        throw error;
-      }
+      if (error) throw new Error(error.message || "Failed to add patient.");
+      
       setPatients(prev => [data as Patient, ...prev]);
       setSaveStatus('saved');
       setLastErrorMessage(null);
@@ -253,9 +226,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) throw new Error("Session Lost.");
+      if (!hospitalId) throw new Error("Auth session lost.");
+      
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Update failed.");
+      
       setPatients(prev => prev.map(p => p.id === updatedPatient.id ? (data as Patient) : p));
       setSaveStatus('saved');
       setLastErrorMessage(null);
@@ -271,7 +246,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) return;
-      await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+      const { error } = await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+      if (error) throw error;
       setPatients(prev => prev.filter(p => p.id !== id));
       setSaveStatus('saved');
     } catch (err: any) {
