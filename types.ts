@@ -61,6 +61,7 @@ export interface PackageProposal {
 
 export interface Patient {
   id: string; // File Registration Number
+  hospital_id: string; // Multi-tenancy identifier
   // Front Office Fields
   name: string;
   dob?: string; // Date of Birth YYYY-MM-DD
@@ -69,8 +70,8 @@ export interface Patient {
   mobile: string;
   occupation: string;
   hasInsurance: 'Yes' | 'No' | 'Not Sure';
-  insuranceName?: string; // New field for insurance provider
-  source: string; // How did you know
+  insuranceName?: string; 
+  source: string; 
   condition: Condition;
   registeredAt: string;
   
