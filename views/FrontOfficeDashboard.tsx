@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Gender, Condition, Patient } from '../types';
-import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar, Pencil, Trash2, Activity, ChevronRight, User } from 'lucide-react';
+import { PlusCircle, Search, CheckCircle, Clock, ArrowLeft, Save, FileText, CreditCard, Calendar, Pencil, Trash2, Activity, ChevronRight, User, Loader2 } from 'lucide-react';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, deletePatient } = useHospital();
+  const { patients, addPatient, updatePatient, deletePatient, saveStatus } = useHospital();
   const [showForm, setShowForm] = useState(false);
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,7 +108,7 @@ export const FrontOfficeDashboard: React.FC = () => {
              ...originalPatient,
              ...formData as Patient,
              id: editingId,
-             age: parseInt(String(formData.age)) || 0
+             age: Number(formData.age) || 0
            });
          }
          setShowForm(false);
@@ -121,14 +121,14 @@ export const FrontOfficeDashboard: React.FC = () => {
         }
         
         if (patients.some(p => p.id === formData.id)) {
-          alert("This File Number already exists. Please assign a unique number.");
+          alert("This File Number already exists in your list. Please assign a unique number.");
           setIsSubmitting(false);
           return;
         }
 
         const payload = {
             ...formData,
-            age: parseInt(String(formData.age)) || 0
+            age: Number(formData.age) || 0
         };
 
         await addPatient(payload as any);
@@ -136,9 +136,8 @@ export const FrontOfficeDashboard: React.FC = () => {
         resetForm();
       }
     } catch (err: any) {
-      const errorMsg = err.message || JSON.stringify(err);
-      console.error("Submission Failed:", errorMsg);
-      alert(`Operation Failed: ${errorMsg}\n\nPlease check your internet connection or table schema.`);
+      console.error("Submission failed", err);
+      // addPatient context handler already alerts the user
     } finally {
       setIsSubmitting(false);
     }
@@ -186,7 +185,14 @@ export const FrontOfficeDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800">Front Office Dashboard</h2>
           <p className="text-gray-500">Patient Registration & Queue Management</p>
         </div>
-        <ExportButtons patients={patients} role="front_office" />
+        <div className="flex items-center gap-3">
+           {saveStatus === 'error' && (
+             <div className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-1 border border-red-100">
+               <Activity className="w-3 h-3" /> Cloud Sync Failed
+             </div>
+           )}
+           <ExportButtons patients={patients} role="front_office" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -311,7 +317,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                                  type="number" 
                                  className="w-full border-b-2 border-gray-200 p-2 focus:border-hospital-500 focus:outline-none text-lg bg-gray-50"
                                  value={formData.age || ''} 
-                                 onChange={e => setFormData({...formData, age: parseInt(e.target.value)})} 
+                                 onChange={e => setFormData({...formData, age: Number(e.target.value)})} 
                                />
                                <span className="text-gray-500">yrs</span>
                              </div>
@@ -582,7 +588,3 @@ export const FrontOfficeDashboard: React.FC = () => {
     </div>
   );
 };
-
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-);
