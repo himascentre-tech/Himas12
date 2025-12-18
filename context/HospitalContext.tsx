@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
 import { supabase } from '../services/supabaseClient';
 
@@ -27,8 +27,6 @@ const HospitalContext = createContext<HospitalContextType | undefined>(undefined
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
 const STORAGE_KEY_PATIENTS = 'himas_patients_cache_v1';
 const SHARED_STAFF_KEY = 'HIMAS_STAFF_DATA';
-
-// Fixed hospital ID for the demo environment to ensure all roles see the same patient list
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -47,6 +45,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
+  
+  // Cache the resolved hospital ID to avoid repeated async calls
+  const cachedHospitalId = useRef<string | null>(null);
 
   useEffect(() => {
     if (patients.length > 0) {
@@ -55,41 +56,41 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [patients]);
 
   const getEffectiveHospitalId = async () => {
+    if (cachedHospitalId.current) return cachedHospitalId.current;
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
     
-    // For demo accounts, we enforce a shared facility ID so data is visible across logins
     const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
-    if (demoEmails.includes(session.user.email || '')) {
-      return SHARED_FACILITY_ID;
-    }
+    const id = demoEmails.includes(session.user.email || '') 
+      ? SHARED_FACILITY_ID 
+      : (session.user.user_metadata?.hospital_id || session.user.id);
     
-    return session.user.user_metadata?.hospital_id || session.user.id;
+    cachedHospitalId.current = id;
+    return id;
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isInitial = false) => {
     if (!currentUserRole) {
       setIsLoading(false);
       return;
     }
     
+    if (isInitial) setIsLoading(true);
     setSaveStatus('saving');
     setLastErrorMessage(null);
 
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) {
-        // Brief retry for session initialization
-        await new Promise(r => setTimeout(r, 800));
-        const retryId = await getEffectiveHospitalId();
-        if (!retryId) throw new Error("Database session lost. Please login again.");
+        // Only error out if we really can't get a session after immediate check
+        throw new Error("Session not found. Please login.");
       }
 
-      const hid = hospitalId || SHARED_FACILITY_ID;
       const { data, error } = await supabase
         .from('himas_data')
         .select('*')
-        .eq('hospital_id', hid);
+        .eq('hospital_id', hospitalId);
 
       if (error) throw error;
       
@@ -101,8 +102,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (e: any) {
-      const msg = e.message || JSON.stringify(e);
-      console.error("Cloud Fetch Error:", msg);
+      const msg = e.message || "Cloud Connection Error";
       setLastErrorMessage(msg);
       setSaveStatus('error');
     } finally {
@@ -115,7 +115,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session && currentUserRole) {
-        await loadData();
+        await loadData(true);
       } else if (!session && currentUserRole) {
         setCurrentUserRole(null);
         setPatients([]);
@@ -125,12 +125,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
         if (event === 'SIGNED_OUT') {
+          cachedHospitalId.current = null;
           setCurrentUserRole(null);
           setPatients([]);
           localStorage.removeItem(STORAGE_KEY_PATIENTS);
           localStorage.removeItem(STORAGE_KEY_ROLE);
         } else if (event === 'SIGNED_IN') {
-          if (currentUserRole) await loadData();
+          if (currentUserRole) await loadData(true);
         }
       });
       return () => subscription.unsubscribe();
@@ -144,11 +145,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     try {
       const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) throw new Error("No active database session.");
+      if (!hospitalId) throw new Error("No active session.");
 
-      // Ensure data types match Supabase schema (Age as Number)
       const payload = {
-        id: patientData.id, // Primary Key (File Number)
+        id: patientData.id,
         hospital_id: hospitalId,
         name: patientData.name,
         dob: patientData.dob || null,
@@ -160,50 +160,59 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         insuranceName: patientData.insuranceName || null,
         source: patientData.source,
         condition: patientData.condition
-        // Note: 'created_at' is omitted so Postgres can handle it automatically
       };
 
-      const { error } = await supabase.from('himas_data').insert(payload);
+      // Use .select().single() to get the newly created record immediately
+      const { data, error } = await supabase
+        .from('himas_data')
+        .insert(payload)
+        .select()
+        .single();
       
       if (error) {
-        if (error.code === '23505') throw new Error("Patient File ID already exists in Database.");
+        if (error.code === '23505') throw new Error("File ID already exists.");
         throw error;
       }
       
+      // Update local state instantly without a full re-fetch
+      setPatients(prev => [data as Patient, ...prev]);
       setSaveStatus('saved');
-      await loadData(); // Refresh list to see new record
+      setLastSavedAt(new Date());
     } catch (err: any) {
-      const msg = err.message || JSON.stringify(err);
+      const msg = err.message || "Save failed";
       setLastErrorMessage(msg);
       setSaveStatus('error');
-      alert(`Database Save Failed: ${msg}`);
       throw new Error(msg);
     }
   };
 
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
-    setLastErrorMessage(null);
     
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) throw new Error("Session Lost.");
 
-      const { error } = await supabase
+      // Perform update and get returned record
+      const { data, error } = await supabase
         .from('himas_data')
         .update({
           ...updatedPatient,
           age: Number(updatedPatient.age) || 0
         })
         .eq('id', updatedPatient.id)
-        .eq('hospital_id', hospitalId);
+        .eq('hospital_id', hospitalId)
+        .select()
+        .single();
 
       if (error) throw error;
       
-      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+      // Update local state directly
+      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? (data as Patient) : p));
       setSaveStatus('saved');
+      setLastSavedAt(new Date());
     } catch (err: any) {
-      setLastErrorMessage(err.message || JSON.stringify(err));
+      setLastErrorMessage(err.message || "Update failed");
       setSaveStatus('error');
     }
   };
@@ -220,7 +229,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setPatients(prev => prev.filter(p => p.id !== id));
       setSaveStatus('saved');
     } catch (err: any) {
-      setLastErrorMessage(err.message || JSON.stringify(err));
+      setLastErrorMessage(err.message || "Delete failed");
       setSaveStatus('error');
     }
   };
@@ -252,7 +261,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     <HospitalContext.Provider value={{
       currentUserRole, setCurrentUserRole, patients, addPatient, updatePatient, deletePatient,
       updateDoctorAssessment, updatePackageProposal, getPatientById, staffUsers, registerStaff,
-      saveStatus, lastSavedAt, refreshData: loadData, isLoading, isStaffLoaded, lastErrorMessage
+      saveStatus, lastSavedAt, refreshData: () => loadData(false), isLoading, isStaffLoaded, lastErrorMessage
     }}>
       {children}
     </HospitalContext.Provider>
