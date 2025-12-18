@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -56,36 +56,35 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Load staff data (Shared lookup)
   useEffect(() => {
     const loadStaffData = async () => {
-      if (isSupabaseConfigured) {
-         try {
-           const { data, error } = await supabase
-             .from("app_data")
-             .select("data")
-             .eq("role", SHARED_STAFF_KEY)
-             .maybeSingle();
-           
-           if (!error && data?.data) setStaffUsers(data.data);
-         } catch(e) { console.error("Staff sync failed", e); }
+      try {
+        const { data, error } = await supabase
+          .from("app_data")
+          .select("data")
+          .eq("role", SHARED_STAFF_KEY)
+          .maybeSingle();
+        
+        if (!error && data?.data) setStaffUsers(data.data);
+      } catch(e) { 
+        console.error("Staff sync failed", e); 
+      } finally {
+        setIsStaffLoaded(true);
       }
-      setIsStaffLoaded(true);
     };
     loadStaffData();
   }, []);
 
-  // --- 2️⃣ SELECT DATA (SCOPED BY HOSPITAL_ID) ---
+  // --- SELECT DATA (SCOPED BY HOSPITAL_ID) ---
   const loadData = async () => {
     if (!currentUserRole) return;
     setIsLoading(true);
     setSaveStatus('saving');
 
     try {
-      // ✅ Retrieve the authenticated user to access metadata
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user && user.user_metadata?.hospital_id) {
         const hospitalId = user.user_metadata.hospital_id;
         
-        // ✅ Filter by hospital_id for strict multi-tenancy
         const { data, error } = await supabase
           .from('himas_data')
           .select('*')
@@ -118,7 +117,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Real-time synchronization (Scoped to current hospital)
   useEffect(() => {
-    if (!isSupabaseConfigured || !currentUserRole) return;
+    if (!currentUserRole) return;
 
     let channel: any;
 
@@ -152,7 +151,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [currentUserRole]);
 
-  // --- 1️⃣ INSERT PATIENT (INJECT HOSPITAL_ID) ---
+  // --- INSERT PATIENT (INJECT HOSPITAL_ID) ---
   const addPatient = async (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => {
     setSaveStatus('saving');
     try {

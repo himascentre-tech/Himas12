@@ -1,10 +1,9 @@
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { isSupabaseConfigured } from '../services/supabaseClient';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, Database } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, lastSavedAt, refreshData, isLoading } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const handleLogout = () => {
@@ -104,13 +103,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto h-screen relative">
-        {/* Warning Banners */}
-        {!isSupabaseConfigured && (
-          <div className="bg-orange-500 text-white text-xs font-bold text-center py-2 px-4 shadow-md flex items-center justify-center gap-2">
-            <Database className="w-4 h-4" />
-            DEMO MODE: Supabase keys missing. Data will NOT save across devices.
-          </div>
-        )}
         {saveStatus === 'error' && (
           <div className="bg-red-500 text-white text-xs font-bold text-center py-2 px-4 shadow-md flex items-center justify-center gap-2">
             <AlertCircle className="w-4 h-4" />

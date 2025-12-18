@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      // Use fallback strings if env vars are missing to ensure build consistency
-      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || "https://xggnswfyegchwlplzvto.supabase.co"),
-      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || "sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox"),
-      'process.env.SENDGRID_API_KEY': JSON.stringify(env.SENDGRID_API_KEY || "")
+      // Define on import.meta.env to satisfy strict project rules and prevent runtime TypeErrors
+      'import.meta.env.API_KEY': JSON.stringify(env.API_KEY),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || "https://xggnswfyegchwlplzvto.supabase.co"),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || "sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox"),
+      'import.meta.env.SENDGRID_API_KEY': JSON.stringify(env.SENDGRID_API_KEY || "")
     }
   };
 });
