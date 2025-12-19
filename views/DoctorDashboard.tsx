@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Clock } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
@@ -112,12 +113,12 @@ export const DoctorDashboard: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-2">
                   <span className="flex items-center gap-1"><User className="w-3 h-3" /> {selectedPatient.name}, {selectedPatient.age} yrs</span>
                   <span className="flex items-center gap-1 text-hospital-700 font-medium bg-hospital-50 px-2 py-0.5 rounded-full"><Activity className="w-3 h-3" /> {selectedPatient.condition}</span>
+                  <span className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full"><Calendar className="w-3 h-3" /> DOP: {selectedPatient.entry_date ? new Date(selectedPatient.entry_date).toLocaleDateString('en-IN') : 'N/A'}</span>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-400">Registered At</div>
-                {/* Fixed: Use created_at instead of registeredAt as per Patient type definition */}
-                <div className="font-mono text-sm">{new Date(selectedPatient.created_at).toLocaleTimeString()}</div>
+                <div className="text-xs text-gray-400">System Registered</div>
+                <div className="font-mono text-sm">{new Date(selectedPatient.created_at).toLocaleString('en-IN', { timeStyle: 'short', dateStyle: 'short' })}</div>
               </div>
             </div>
             

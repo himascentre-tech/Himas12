@@ -1,3 +1,4 @@
+
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -64,6 +65,7 @@ export interface Patient {
   hospital_id: string; // Multi-tenancy identifier
   name: string;
   dob?: string; 
+  entry_date: string; // Date of Presentation (DOP)
   gender: Gender;
   age: number;
   mobile: string;

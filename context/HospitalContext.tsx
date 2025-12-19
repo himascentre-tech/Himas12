@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -89,6 +90,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     const { data, error } = await query.select().single();
 
     if (error) {
+      // Catch missing column errors specifically
+      if (error.message?.includes('entry_date') || error.message?.includes('column')) {
+         return {
+           data: null,
+           error: {
+             message: `DATABASE SCHEMA MISMATCH: The column 'entry_date' is missing. Please run this SQL in Supabase: ALTER TABLE himas_data ADD COLUMN entry_date DATE;`
+           }
+         };
+      }
+      
       if (error.code === '22P02' && error.message.includes('uuid')) {
         return { 
           data: null, 

@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, StaffUser } from '../types';
-import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock } from 'lucide-react';
+import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
@@ -189,6 +190,9 @@ export const PackageTeamDashboard: React.FC = () => {
                           <span>Insurance: {selectedPatient.hasInsurance}</span>
                           <span>Occupation: {selectedPatient.occupation}</span>
                           <span>Source: {selectedPatient.source}</span>
+                          <span className="flex items-center gap-1 font-bold text-hospital-600">
+                            <Calendar className="w-3 h-3" /> DOP: {selectedPatient.entry_date ? new Date(selectedPatient.entry_date).toLocaleDateString('en-IN') : 'N/A'}
+                          </span>
                         </div>
                       </div>
                       <div className="text-right">
