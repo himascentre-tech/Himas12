@@ -1,12 +1,12 @@
+
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, Info, RefreshCw } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, lastErrorMessage, forceStopLoading } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, lastErrorMessage, forceStopLoading, isSheetsSyncEnabled } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showErrorDetail, setShowErrorDetail] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   useEffect(() => {
@@ -46,16 +46,23 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   };
 
   const CloudStatus = () => {
-    if (saveStatus === 'saving') return <span className="flex items-center gap-1 text-blue-400 text-xs animate-pulse"><Loader2 className="w-3 h-3 animate-spin"/> Syncing...</span>;
-    if (saveStatus === 'saved') return <span className="flex items-center gap-1 text-green-400 text-xs"><Check className="w-3 h-3"/> Saved</span>;
+    if (saveStatus === 'saving') return <span className="flex items-center gap-1 text-blue-400 text-[10px] animate-pulse"><Loader2 className="w-2.5 h-2.5 animate-spin"/> Syncing...</span>;
+    if (saveStatus === 'saved') return <span className="flex items-center gap-1 text-green-400 text-[10px]"><Check className="w-2.5 h-2.5"/> Cloud Saved</span>;
     if (saveStatus === 'error') return (
-      <div className="flex flex-col gap-1">
-        <span onClick={() => refreshData()} className="flex items-center gap-1 text-red-400 text-xs cursor-pointer hover:underline font-bold">
-          <AlertCircle className="w-3 h-3"/> Sync Error (Retry)
-        </span>
-      </div>
+      <span onClick={() => refreshData()} className="flex items-center gap-1 text-red-400 text-[10px] cursor-pointer hover:underline font-bold">
+        <AlertCircle className="w-2.5 h-2.5"/> Sync Error
+      </span>
     );
-    return <span className="flex items-center gap-1 text-gray-500 text-xs"><Cloud className="w-3 h-3"/> Connected</span>;
+    return <span className="flex items-center gap-1 text-gray-500 text-[10px]"><Cloud className="w-2.5 h-2.5"/> Connected</span>;
+  };
+
+  const SheetsStatus = () => {
+    if (!isSheetsSyncEnabled) return null;
+    return (
+      <span className="flex items-center gap-1 text-hospital-400 text-[10px] mt-1">
+        <FileSpreadsheet className="w-2.5 h-2.5"/> Sheets Active
+      </span>
+    );
   };
 
   if (isLoading) {
@@ -71,30 +78,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         {showTroubleshoot && (
           <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm max-w-md w-full">
             <div className="text-amber-600 font-bold text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Connection taking longer than expected
+              <AlertCircle className="w-4 h-4" /> Connection slow
             </div>
-            <p className="text-xs text-slate-500 text-center">
-              This usually happens due to slow network or if your Supabase project is waking up from hibernation.
-            </p>
             <div className="flex flex-wrap gap-2 justify-center w-full">
-               <button 
-                 onClick={() => window.location.reload()}
-                 className="flex-1 bg-white text-slate-700 px-4 py-3 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all"
-               >
-                 <RefreshCw className="w-3 h-3" /> Refresh Page
+               <button onClick={() => window.location.reload()} className="flex-1 bg-white text-slate-700 px-4 py-3 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
+                 <RefreshCw className="w-3 h-3" /> Refresh
                </button>
-               <button 
-                 onClick={forceStopLoading}
-                 className="flex-1 bg-hospital-600 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 flex items-center justify-center gap-2 transition-all"
-               >
-                 Enter Dashboard Anyway
+               <button onClick={forceStopLoading} className="flex-1 bg-hospital-600 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all">
+                 Enter Anyway
                </button>
             </div>
-            {lastErrorMessage && (
-              <div className="mt-2 w-full p-3 bg-red-50 rounded-xl border border-red-100 text-[10px] text-red-600 font-mono break-all max-h-24 overflow-y-auto">
-                <span className="font-bold">Latest Error:</span> {lastErrorMessage}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -127,7 +120,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <div className="text-hospital-400 bg-slate-900 p-2 rounded-xl">{getRoleIcon()}</div>
               <div>
                 <div className="font-bold text-slate-200 text-xs">{getRoleLabel()}</div>
-                <div className="mt-1"><CloudStatus /></div>
+                <div className="mt-1 flex flex-col">
+                  <CloudStatus />
+                  <SheetsStatus />
+                </div>
               </div>
             </div>
           </div>

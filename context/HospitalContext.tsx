@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { syncToGoogleSheets } from '../services/googleSheetsService';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -22,6 +24,7 @@ interface HospitalContextType {
   lastErrorMessage: string | null;
   clearError: () => void;
   forceStopLoading: () => void;
+  isSheetsSyncEnabled: boolean;
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
@@ -46,6 +49,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
+  // Flag is now true because we have a hardcoded URL in the service
+  const isSheetsSyncEnabled = true;
   const cachedHospitalId = useRef<string | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
@@ -89,7 +94,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     const { data, error } = await query.select().single();
 
     if (error) {
-      // HANDLE UUID ERROR SPECIFICALLY
       if (error.code === '22P02' && error.message.includes('uuid')) {
         return { 
           data: null, 
@@ -203,7 +207,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data, error } = await performSafeUpsert(payload, false);
       if (error) throw new Error(error.message || "Failed to save to cloud.");
       
-      setPatients(prev => [data as Patient, ...prev]);
+      const newPatient = data as Patient;
+      setPatients(prev => [newPatient, ...prev]);
+      
+      // Real-time sync to Google Sheets
+      syncToGoogleSheets(newPatient);
+
       setSaveStatus('saved');
       setLastErrorMessage(null);
     } catch (err: any) {
@@ -221,7 +230,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (!hospitalId) throw new Error("Session Lost.");
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
       if (error) throw new Error(error.message || "Update failed.");
-      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? (data as Patient) : p));
+      
+      const savedPatient = data as Patient;
+      setPatients(prev => prev.map(p => p.id === savedPatient.id ? savedPatient : p));
+      
+      // Real-time sync to Google Sheets
+      syncToGoogleSheets(savedPatient);
+
       setSaveStatus('saved');
       setLastErrorMessage(null);
     } catch (err: any) {
@@ -260,7 +275,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       staffUsers, registerStaff: async () => {},
       saveStatus, lastSavedAt, refreshData: loadData, 
       isLoading, isStaffLoaded: true, lastErrorMessage, clearError,
-      forceStopLoading
+      forceStopLoading, isSheetsSyncEnabled
     }}>
       {children}
     </HospitalContext.Provider>
