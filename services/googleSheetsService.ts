@@ -3,15 +3,19 @@ import { Patient } from "../types";
 
 /**
  * Service to sync patient data to Google Sheets via a Web App URL.
- * Matches the deployment URL provided in the user's screenshot.
+ * Users should provide their Web App URL in the VITE_GOOGLE_SHEETS_WEBHOOK environment variable.
  */
 export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => {
-  // This is the WEB APP URL from your Apps Script deployment
-  const GOOGLE_SHEETS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwfn17eLABTbGCzm7gm8HFsSHz0YkBVEtyi7j8-B0V397M3zt7-h_19FLhCLDCnqkTe/exec';
+  // Fixed: Removed 'as any' cast as ImportMetaEnv is now properly defined in vite-env.d.ts
+  const GOOGLE_SHEETS_URL = import.meta.env?.VITE_GOOGLE_SHEETS_WEBHOOK || '';
+
+  if (!GOOGLE_SHEETS_URL) {
+    console.warn("Google Sheets Webhook URL not configured. Skipping real-time sync.");
+    return false;
+  }
 
   try {
     const payload = {
-      // Basic Registration
       id: patient.id,
       name: patient.name,
       mobile: patient.mobile,
@@ -21,41 +25,23 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       source: patient.source,
       hasInsurance: patient.hasInsurance,
       occupation: patient.occupation,
-      
-      // Medical Side (Doctor)
-      surgeonCode: patient.doctorAssessment?.quickCode || '',
-      painSeverity: patient.doctorAssessment?.painSeverity || '',
-      surgeryDate: patient.doctorAssessment?.tentativeSurgeryDate || '',
-      readiness: patient.doctorAssessment?.conversionReadiness || '',
-      affordability: patient.doctorAssessment?.affordability || '',
-      
-      // Business Side (Counselor)
-      objection: patient.packageProposal?.objectionIdentified || '',
-      strategy: patient.packageProposal?.counselingStrategy || '',
-      followUp: patient.packageProposal?.followUpDate || '',
-      decisionPattern: patient.packageProposal?.decisionPattern || '',
-      
-      lastUpdated: new Date().toLocaleString()
+      timestamp: new Date().toISOString()
     };
 
-    console.log("📊 [Sync] Triggering update for patient:", payload.id);
-
-    // Using 'text/plain' and 'no-cors' is mandatory for Google Apps Script 
-    // to avoid security blocks from the browser.
-    await fetch(GOOGLE_SHEETS_WEB_APP_URL, {
+    // We use no-cors if the Apps Script isn't configured for CORS, 
+    // but standard POST usually works for Web Apps.
+    const response = await fetch(GOOGLE_SHEETS_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      cache: 'no-cache',
+      mode: 'no-cors', // Important for Google Apps Script redirects
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
 
-    console.log("📊 [Sync] Data dispatched successfully.");
     return true;
   } catch (error) {
-    console.error("📊 [Sync Error]:", error);
+    console.error("Google Sheets Sync Error:", error);
     return false;
   }
 };

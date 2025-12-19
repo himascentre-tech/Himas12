@@ -49,7 +49,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
-  const isSheetsSyncEnabled = true;
+  // Fixed: Removed 'as any' cast as ImportMetaEnv is now properly defined in vite-env.d.ts
+  const isSheetsSyncEnabled = !!import.meta.env?.VITE_GOOGLE_SHEETS_WEBHOOK;
   const cachedHospitalId = useRef<string | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
@@ -91,6 +92,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       : supabase.from(table).insert(payload);
 
     const { data, error } = await query.select().single();
+
+    if (error) {
+      if (error.code === '22P02' && error.message.includes('uuid')) {
+        return { 
+          data: null, 
+          error: { 
+            message: "DB CONFIG ERROR: Your database expects a UUID but you entered a Custom ID. Please run 'ALTER TABLE himas_data ALTER COLUMN id TYPE TEXT;' in your Supabase SQL Editor." 
+          } 
+        };
+      }
+      return { data: null, error };
+    }
+    
     return { data, error };
   };
 
@@ -126,8 +140,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(sortedData));
       setSaveStatus('saved');
       setLastSavedAt(new Date());
+      setLastErrorMessage(null);
     } catch (e: any) {
+      console.error("Sync Error:", e);
+      const msg = e.message || (typeof e === 'string' ? e : "Database connection failed.");
+      setLastErrorMessage(msg);
       setSaveStatus('error');
+      
       const cached = localStorage.getItem(STORAGE_KEY_PATIENTS);
       if (cached) {
         try { setPatients(JSON.parse(cached)); } catch(err) {}
@@ -140,11 +159,36 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     let mounted = true;
     const init = async () => {
-      const hospitalId = await getEffectiveHospitalId();
-      if (mounted && hospitalId) await loadData();
-      else if (mounted) setIsLoading(false);
+      try {
+        const hospitalId = await getEffectiveHospitalId();
+        if (mounted) {
+          if (hospitalId) await loadData();
+          else setIsLoading(false);
+        }
+      } catch (err) {
+        if (mounted) setIsLoading(false);
+      }
     };
+
     init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_IN') {
+        cachedHospitalId.current = null;
+        await loadData();
+      } else if (event === 'SIGNED_OUT') {
+        cachedHospitalId.current = null;
+        setPatients([]);
+        setCurrentUserRole(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [loadData]);
 
   const addPatient = async (patientData: Omit<Patient, 'created_at' | 'hospital_id'>) => {
@@ -161,18 +205,23 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
 
       const { data, error } = await performSafeUpsert(payload, false);
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message || "Failed to save to cloud.");
       
       const newPatient = data as Patient;
       setPatients(prev => [newPatient, ...prev]);
       
-      // Trigger Google Sheets Sync
-      await syncToGoogleSheets(newPatient);
+      // Real-time sync to Google Sheets
+      if (isSheetsSyncEnabled) {
+        syncToGoogleSheets(newPatient);
+      }
 
       setSaveStatus('saved');
+      setLastErrorMessage(null);
     } catch (err: any) {
+      const msg = err.message || "Submit failed.";
+      setLastErrorMessage(msg);
       setSaveStatus('error');
-      throw err;
+      throw new Error(msg); 
     }
   };
 
@@ -182,18 +231,23 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) throw new Error("Session Lost.");
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message || "Update failed.");
       
       const savedPatient = data as Patient;
       setPatients(prev => prev.map(p => p.id === savedPatient.id ? savedPatient : p));
       
-      // Sync update to Google Sheets
-      await syncToGoogleSheets(savedPatient);
+      // Real-time sync to Google Sheets
+      if (isSheetsSyncEnabled) {
+        syncToGoogleSheets(savedPatient);
+      }
 
       setSaveStatus('saved');
+      setLastErrorMessage(null);
     } catch (err: any) {
+      const msg = err.message || "Update error.";
+      setLastErrorMessage(msg);
       setSaveStatus('error');
-      throw err;
+      throw new Error(msg);
     }
   };
 

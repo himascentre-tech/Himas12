@@ -1,16 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, lastErrorMessage, forceStopLoading, isSheetsSyncEnabled } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
-
-  // Link provided by the user
-  const GOOGLE_SHEET_VIEW_URL = 'https://docs.google.com/spreadsheets/d/1Bkbf07gDbKFVeT3yb8tSYvXWQnLj86aQZA-Td1snTVc/edit?usp=sharing';
 
   useEffect(() => {
     if (isLoading) {
@@ -135,17 +132,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <button className="w-full flex items-center gap-3 px-4 py-3 bg-hospital-600 text-white rounded-xl font-bold shadow-lg shadow-hospital-900/50 transition-all">
               <FileText className="w-5 h-5" /> Dashboard
             </button>
-            
-            <a 
-              href={GOOGLE_SHEET_VIEW_URL} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl font-bold transition-all mt-4 border border-slate-800 border-dashed"
-            >
-              <FileSpreadsheet className="w-5 h-5 text-green-500" /> 
-              <span className="flex-1">View Sheet</span>
-              <ExternalLink className="w-3 h-3 opacity-50" />
-            </a>
           </nav>
 
           <div className="pt-6 border-t border-slate-800">
