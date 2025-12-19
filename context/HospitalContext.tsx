@@ -1,8 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { syncToGoogleSheets } from '../services/googleSheetsService';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -24,7 +22,6 @@ interface HospitalContextType {
   lastErrorMessage: string | null;
   clearError: () => void;
   forceStopLoading: () => void;
-  isSheetsSyncEnabled: boolean;
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
@@ -49,8 +46,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
-  // Fixed: Removed 'as any' cast as ImportMetaEnv is now properly defined in vite-env.d.ts
-  const isSheetsSyncEnabled = !!import.meta.env?.VITE_GOOGLE_SHEETS_WEBHOOK;
   const cachedHospitalId = useRef<string | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
@@ -210,11 +205,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newPatient = data as Patient;
       setPatients(prev => [newPatient, ...prev]);
       
-      // Real-time sync to Google Sheets
-      if (isSheetsSyncEnabled) {
-        syncToGoogleSheets(newPatient);
-      }
-
       setSaveStatus('saved');
       setLastErrorMessage(null);
     } catch (err: any) {
@@ -236,11 +226,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const savedPatient = data as Patient;
       setPatients(prev => prev.map(p => p.id === savedPatient.id ? savedPatient : p));
       
-      // Real-time sync to Google Sheets
-      if (isSheetsSyncEnabled) {
-        syncToGoogleSheets(savedPatient);
-      }
-
       setSaveStatus('saved');
       setLastErrorMessage(null);
     } catch (err: any) {
@@ -279,7 +264,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       staffUsers, registerStaff: async () => {},
       saveStatus, lastSavedAt, refreshData: loadData, 
       isLoading, isStaffLoaded: true, lastErrorMessage, clearError,
-      forceStopLoading, isSheetsSyncEnabled
+      forceStopLoading
     }}>
       {children}
     </HospitalContext.Provider>

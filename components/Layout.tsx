@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, lastErrorMessage, forceStopLoading, isSheetsSyncEnabled } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
@@ -54,15 +53,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </span>
     );
     return <span className="flex items-center gap-1 text-gray-500 text-[10px]"><Cloud className="w-2.5 h-2.5"/> Connected</span>;
-  };
-
-  const SheetsStatus = () => {
-    if (!isSheetsSyncEnabled) return null;
-    return (
-      <span className="flex items-center gap-1 text-hospital-400 text-[10px] mt-1">
-        <FileSpreadsheet className="w-2.5 h-2.5"/> Sheets Active
-      </span>
-    );
   };
 
   if (isLoading) {
@@ -122,7 +112,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <div className="font-bold text-slate-200 text-xs">{getRoleLabel()}</div>
                 <div className="mt-1 flex flex-col">
                   <CloudStatus />
-                  <SheetsStatus />
                 </div>
               </div>
             </div>
