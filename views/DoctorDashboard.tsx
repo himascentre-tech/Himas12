@@ -37,6 +37,27 @@ export const DoctorDashboard: React.FC = () => {
     }
   }, [selectedPatient]);
 
+  const isMedicationOnly = assessment.quickCode === SurgeonCode.M1;
+
+  const handleQuickCodeChange = (code: SurgeonCode) => {
+    if (code === SurgeonCode.M1) {
+      // Clear surgical-specific fields if switching to Medication Only
+      setAssessment({
+        ...assessment,
+        quickCode: code,
+        painSeverity: PainSeverity.Low, // Default to low for medication cases
+        affordability: Affordability.A1,
+        conversionReadiness: ConversionReadiness.CR4, // Not ready/Not applicable
+        tentativeSurgeryDate: ''
+      });
+    } else {
+      setAssessment({
+        ...assessment,
+        quickCode: code
+      });
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedPatient && assessment.doctorSignature) {
@@ -50,8 +71,6 @@ export const DoctorDashboard: React.FC = () => {
 
   const queue = patients.filter(p => !p.doctorAssessment);
   const completed = patients.filter(p => p.doctorAssessment);
-
-  const isMedicationOnly = assessment.quickCode === SurgeonCode.M1;
 
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
@@ -140,21 +159,29 @@ export const DoctorDashboard: React.FC = () => {
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-8">
               {/* Clinical Assessment */}
               <section>
-                <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <Stethoscope className="w-5 h-5 text-hospital-500" /> Clinical Assessment
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+                    <Stethoscope className="w-5 h-5 text-hospital-500" /> Clinical Assessment
+                  </h3>
+                  {isMedicationOnly && (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full uppercase tracking-tighter">
+                      Surgical metrics disabled for M1
+                    </span>
+                  )}
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-2">Surgeon Quick Code</label>
                      <div className="space-y-2">
                        {Object.values(SurgeonCode).map(code => (
-                         <label key={code} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${assessment.quickCode === code ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50'}`}>
+                         <label key={code} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${assessment.quickCode === code ? 'bg-blue-50 border-blue-500 shadow-sm' : 'hover:bg-gray-50'}`}>
                            <input 
                              type="radio" 
                              name="quickCode" 
                              value={code}
                              checked={assessment.quickCode === code}
-                             onChange={() => setAssessment({...assessment, quickCode: code})}
+                             onChange={() => handleQuickCodeChange(code)}
                              className="text-hospital-600 focus:ring-hospital-500"
                            />
                            <span className="ml-3 text-sm font-medium text-gray-900">{code}</span>
@@ -163,7 +190,7 @@ export const DoctorDashboard: React.FC = () => {
                      </div>
                    </div>
                    
-                   {!isMedicationOnly && (
+                   {!isMedicationOnly ? (
                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                        <label className="block text-sm font-medium text-gray-700 mb-2">Pain Severity</label>
                        <div className="flex flex-col gap-2">
@@ -185,55 +212,64 @@ export const DoctorDashboard: React.FC = () => {
                          ))}
                        </div>
                      </div>
+                   ) : (
+                     <div className="flex items-center justify-center border-2 border-dashed border-gray-100 rounded-xl p-6 bg-gray-50/50">
+                        <div className="text-center">
+                          <Activity className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pain Assessment Not Required</p>
+                        </div>
+                     </div>
                    )}
                 </div>
               </section>
 
-              {!isMedicationOnly && <hr className="border-gray-100" />}
-
-              {/* Conversion Indicators - Hidden for M1 */}
               {!isMedicationOnly && (
-                <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                    <ChevronRight className="w-5 h-5 text-hospital-500" /> Conversion Indicators
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Affordability Indicator</label>
-                      <select 
-                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
-                        value={assessment.affordability}
-                        onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}
-                      >
-                        {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
-                      </select>
-                    </div>
+                <>
+                  <hr className="border-gray-100" />
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Conversion Readiness</label>
-                      <select 
-                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
-                        value={assessment.conversionReadiness}
-                        onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}
-                      >
-                        {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
-                      </select>
-                    </div>
+                  {/* Conversion Indicators */}
+                  <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                      <ChevronRight className="w-5 h-5 text-hospital-500" /> Conversion Indicators
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Affordability Indicator</label>
+                        <select 
+                          className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
+                          value={assessment.affordability}
+                          onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}
+                        >
+                          {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Tentative Surgery Date</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input 
-                          type="date" 
-                          className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                          value={assessment.tentativeSurgeryDate}
-                          onChange={e => setAssessment({...assessment, tentativeSurgeryDate: e.target.value})}
-                        />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Conversion Readiness</label>
+                        <select 
+                          className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
+                          value={assessment.conversionReadiness}
+                          onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}
+                        >
+                          {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Tentative Surgery Date</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <input 
+                            type="date" 
+                            className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                            value={assessment.tentativeSurgeryDate}
+                            onChange={e => setAssessment({...assessment, tentativeSurgeryDate: e.target.value})}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
+                </>
               )}
 
               {/* Signature */}

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, Role, StaffUser } from '../types';
+import { Patient, PackageProposal, Role, StaffUser, SurgeonCode } from '../types';
 import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -36,7 +36,10 @@ export const PackageTeamDashboard: React.FC = () => {
   // --- Logic ---
   
   const filteredPatients = patients.filter(p => {
+    // Only show patients who have been assessed AND are recommended for Surgery (S1)
     if (!p.doctorAssessment) return false; 
+    if (p.doctorAssessment.quickCode === SurgeonCode.M1) return false;
+
     if (filter === 'ALL') return true;
     return p.doctorAssessment.conversionReadiness.startsWith(filter);
   });
@@ -144,7 +147,7 @@ export const PackageTeamDashboard: React.FC = () => {
             {/* List */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-1 h-[600px] flex flex-col">
               <div className="p-4 border-b bg-gray-50 font-semibold text-gray-700">
-                Candidates for Counseling
+                Surgical Candidates ({filteredPatients.length})
               </div>
               <div className="overflow-y-auto flex-1 p-2 space-y-2">
                 {filteredPatients.map(p => (
@@ -173,7 +176,12 @@ export const PackageTeamDashboard: React.FC = () => {
                     )}
                   </div>
                 ))}
-                {filteredPatients.length === 0 && <div className="p-4 text-gray-400 text-center text-sm">No patients found.</div>}
+                {filteredPatients.length === 0 && (
+                  <div className="p-8 text-center">
+                    <CheckCircle2 className="w-12 h-12 text-gray-200 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">No surgical candidates awaiting counseling.</p>
+                  </div>
+                )}
               </div>
             </div>
 
