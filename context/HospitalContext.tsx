@@ -83,35 +83,33 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const performSafeUpsert = async (payload: any, isUpdate = false) => {
     const table = 'himas_data';
-    const query = isUpdate 
-      ? supabase.from(table).update(payload).eq('id', payload.id)
-      : supabase.from(table).insert(payload);
+    
+    const runQuery = async (p: any) => {
+      return isUpdate 
+        ? supabase.from(table).update(p).eq('id', p.id).select().single()
+        : supabase.from(table).insert(p).select().single();
+    };
 
-    const { data, error } = await query.select().single();
+    let result = await runQuery(payload);
 
-    if (error) {
-      // Catch missing column errors specifically
-      if (error.message?.includes('entry_date') || error.message?.includes('column')) {
-         return {
-           data: null,
-           error: {
-             message: `DATABASE SCHEMA MISMATCH: The column 'entry_date' is missing. Please run this SQL in Supabase: ALTER TABLE himas_data ADD COLUMN entry_date DATE;`
-           }
-         };
+    if (result.error) {
+      const msg = result.error.message || "";
+      const code = result.error.code;
+
+      // Handle missing 'entry_date' column specifically (Postgres 42703 is undefined_column)
+      if (msg.includes('entry_date') || msg.includes('column') || code === '42703') {
+         console.warn("Attempting recovery: Saving without 'entry_date' column...");
+         const { entry_date, ...fallbackPayload } = payload;
+         const retryResult = await runQuery(fallbackPayload);
+         
+         if (!retryResult.error) {
+            setLastErrorMessage(`CRITICAL: 'entry_date' column is missing in your Database. Please run the ALTER TABLE SQL provided in the warning below.`);
+            return retryResult;
+         }
       }
-      
-      if (error.code === '22P02' && error.message.includes('uuid')) {
-        return { 
-          data: null, 
-          error: { 
-            message: "DB CONFIG ERROR: Your database expects a UUID but you entered a Custom ID. Please run 'ALTER TABLE himas_data ALTER COLUMN id TYPE TEXT;' in your Supabase SQL Editor." 
-          } 
-        };
-      }
-      return { data: null, error };
     }
     
-    return { data, error };
+    return result;
   };
 
   const loadData = useCallback(async () => {
@@ -135,10 +133,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const sortedData = (data || []).map(item => ({
         ...item,
+        // Fallback for UI if entry_date column exists but is null, OR if column is missing entirely from query
+        entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
         age: item.age ?? 0 
       })).sort((a, b) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        const dateA = new Date(a.entry_date).getTime();
+        const dateB = new Date(b.entry_date).getTime();
         return dateB - dateA; 
       });
 
@@ -146,36 +146,28 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(sortedData));
       setSaveStatus('saved');
       setLastSavedAt(new Date());
-      setLastErrorMessage(null);
+      // Don't auto-clear the error if it's a schema warning to keep the user informed
+      if (!lastErrorMessage?.includes('column is missing')) setLastErrorMessage(null);
     } catch (e: any) {
       console.error("Sync Error:", e);
-      const msg = e.message || (typeof e === 'string' ? e : "Database connection failed.");
-      setLastErrorMessage(msg);
+      setLastErrorMessage(e.message || "Database connection failed.");
       setSaveStatus('error');
-      
-      const cached = localStorage.getItem(STORAGE_KEY_PATIENTS);
-      if (cached) {
-        try { setPatients(JSON.parse(cached)); } catch(err) {}
-      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [lastErrorMessage]);
 
   useEffect(() => {
     let mounted = true;
     const init = async () => {
       try {
         const hospitalId = await getEffectiveHospitalId();
-        if (mounted) {
-          if (hospitalId) await loadData();
-          else setIsLoading(false);
-        }
+        if (mounted && hospitalId) await loadData();
+        else if (mounted) setIsLoading(false);
       } catch (err) {
         if (mounted) setIsLoading(false);
       }
     };
-
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
@@ -211,18 +203,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
 
       const { data, error } = await performSafeUpsert(payload, false);
-      if (error) throw new Error(error.message || "Failed to save to cloud.");
+      if (error) throw new Error(error.message);
       
-      const newPatient = data as Patient;
+      const newPatient = {
+        ...data,
+        entry_date: data.entry_date || (data.created_at ? data.created_at.split('T')[0] : payload.entry_date)
+      } as Patient;
+      
       setPatients(prev => [newPatient, ...prev]);
-      
       setSaveStatus('saved');
-      setLastErrorMessage(null);
     } catch (err: any) {
-      const msg = err.message || "Submit failed.";
-      setLastErrorMessage(msg);
+      setLastErrorMessage(err.message || "Submit failed.");
       setSaveStatus('error');
-      throw new Error(msg); 
+      throw err;
     }
   };
 
@@ -232,18 +225,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) throw new Error("Session Lost.");
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
-      if (error) throw new Error(error.message || "Update failed.");
+      if (error) throw new Error(error.message);
       
-      const savedPatient = data as Patient;
+      const savedPatient = {
+        ...data,
+        entry_date: data.entry_date || updatedPatient.entry_date
+      } as Patient;
+      
       setPatients(prev => prev.map(p => p.id === savedPatient.id ? savedPatient : p));
-      
       setSaveStatus('saved');
-      setLastErrorMessage(null);
     } catch (err: any) {
-      const msg = err.message || "Update error.";
-      setLastErrorMessage(msg);
+      setLastErrorMessage(err.message || "Update error.");
       setSaveStatus('error');
-      throw new Error(msg);
+      throw err;
     }
   };
 

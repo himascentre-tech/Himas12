@@ -51,13 +51,15 @@ export const DoctorDashboard: React.FC = () => {
   const queue = patients.filter(p => !p.doctorAssessment);
   const completed = patients.filter(p => p.doctorAssessment);
 
+  const isMedicationOnly = assessment.quickCode === SurgeonCode.M1;
+
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
       {/* Left Panel: Queue */}
       <div className="w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
         <div className="p-4 border-b bg-gray-50">
            <h3 className="font-bold text-gray-700 flex items-center gap-2">
-             <User className="w-5 h-5 text-hospital-600" /> Patient Queue
+             <Stethoscope className="w-5 h-5 text-hospital-600" /> Patient Queue
            </h3>
            <div className="flex gap-4 mt-2 text-xs">
              <span className="text-orange-600 font-semibold">{queue.length} Pending</span>
@@ -117,8 +119,8 @@ export const DoctorDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-400">System Registered</div>
-                <div className="font-mono text-sm">{new Date(selectedPatient.created_at).toLocaleString('en-IN', { timeStyle: 'short', dateStyle: 'short' })}</div>
+                <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">Patient File ID</div>
+                <div className="font-mono text-lg font-bold text-hospital-600">{selectedPatient.id}</div>
               </div>
             </div>
             
@@ -141,7 +143,7 @@ export const DoctorDashboard: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
                   <Stethoscope className="w-5 h-5 text-hospital-500" /> Clinical Assessment
                 </h3>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-2">Surgeon Quick Code</label>
                      <div className="space-y-2">
@@ -161,74 +163,78 @@ export const DoctorDashboard: React.FC = () => {
                      </div>
                    </div>
                    
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-2">Pain Severity</label>
-                     <div className="flex gap-2">
-                       {Object.values(PainSeverity).map(severity => (
-                         <button
-                           key={severity}
-                           type="button"
-                           onClick={() => setAssessment({...assessment, painSeverity: severity})}
-                           className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-all ${
-                             assessment.painSeverity === severity
-                               ? severity === 'High' ? 'bg-red-50 border-red-500 text-red-700'
-                               : severity === 'Moderate' ? 'bg-orange-50 border-orange-500 text-orange-700'
-                               : 'bg-green-50 border-green-500 text-green-700'
-                               : 'hover:bg-gray-50 border-gray-200 text-gray-600'
-                           }`}
-                         >
-                           {severity}
-                         </button>
-                       ))}
+                   {!isMedicationOnly && (
+                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                       <label className="block text-sm font-medium text-gray-700 mb-2">Pain Severity</label>
+                       <div className="flex flex-col gap-2">
+                         {Object.values(PainSeverity).map(severity => (
+                           <button
+                             key={severity}
+                             type="button"
+                             onClick={() => setAssessment({...assessment, painSeverity: severity})}
+                             className={`w-full py-3 rounded-lg border text-sm font-medium transition-all ${
+                               assessment.painSeverity === severity
+                                 ? severity === 'High' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
+                                 : severity === 'Moderate' ? 'bg-orange-50 border-orange-500 text-orange-700 shadow-sm'
+                                 : 'bg-green-50 border-green-500 text-green-700 shadow-sm'
+                                 : 'hover:bg-gray-50 border-gray-200 text-gray-600'
+                             }`}
+                           >
+                             {severity}
+                           </button>
+                         ))}
+                       </div>
                      </div>
-                   </div>
+                   )}
                 </div>
               </section>
 
-              <hr className="border-gray-100" />
+              {!isMedicationOnly && <hr className="border-gray-100" />}
 
-              {/* Conversion Indicators */}
-              <section>
-                <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <ChevronRight className="w-5 h-5 text-hospital-500" /> Conversion Indicators
-                </h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Affordability Indicator</label>
-                    <select 
-                      className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
-                      value={assessment.affordability}
-                      onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}
-                    >
-                      {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                  </div>
+              {/* Conversion Indicators - Hidden for M1 */}
+              {!isMedicationOnly && (
+                <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                    <ChevronRight className="w-5 h-5 text-hospital-500" /> Conversion Indicators
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Affordability Indicator</label>
+                      <select 
+                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
+                        value={assessment.affordability}
+                        onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}
+                      >
+                        {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Conversion Readiness</label>
-                    <select 
-                      className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
-                      value={assessment.conversionReadiness}
-                      onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}
-                    >
-                      {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Conversion Readiness</label>
+                      <select 
+                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500 focus:border-hospital-500"
+                        value={assessment.conversionReadiness}
+                        onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}
+                      >
+                        {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tentative Surgery Date</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input 
-                        type="date" 
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                        value={assessment.tentativeSurgeryDate}
-                        onChange={e => setAssessment({...assessment, tentativeSurgeryDate: e.target.value})}
-                      />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Tentative Surgery Date</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input 
+                          type="date" 
+                          className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                          value={assessment.tentativeSurgeryDate}
+                          onChange={e => setAssessment({...assessment, tentativeSurgeryDate: e.target.value})}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Signature */}
               <div className="bg-gray-50 p-6 rounded-lg border border-dashed border-gray-300">
@@ -245,11 +251,11 @@ export const DoctorDashboard: React.FC = () => {
               </div>
 
               <div className="flex justify-end gap-4 pb-4">
-                <button type="button" onClick={() => setSelectedPatient(null)} className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="button" onClick={() => setSelectedPatient(null)} className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-bold">Cancel</button>
                 <button 
                   type="submit" 
                   disabled={!assessment.doctorSignature}
-                  className="px-6 py-2 bg-hospital-600 text-white rounded-lg hover:bg-hospital-700 shadow-lg shadow-hospital-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-2.5 bg-hospital-600 text-white rounded-lg hover:bg-hospital-700 shadow-lg shadow-hospital-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold"
                 >
                   <Save className="w-4 h-4" />
                   Save Assessment
@@ -260,7 +266,8 @@ export const DoctorDashboard: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
              <Stethoscope className="w-16 h-16 mb-4 text-gray-200" />
-             <p>Select a patient from the queue to start evaluation</p>
+             <p className="font-medium text-lg">Select a patient from the queue to start evaluation</p>
+             <p className="text-sm">Patient files awaiting your clinical input will appear on the left.</p>
           </div>
         )}
       </div>

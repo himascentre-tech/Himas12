@@ -4,14 +4,14 @@ import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Gender, Condition, Patient } from '../types';
 import { 
-  PlusCircle, Search, CheckCircle, Clock, ArrowLeft, 
-  Pencil, Trash2, Activity, User, Loader2, Calendar, 
-  Phone, Briefcase, ChevronRight, Check, AlertCircle, X, Search as SearchIcon, Hash, MapPin, Cake,
-  FileText, Info
+  PlusCircle, Search, CheckCircle, Clock, 
+  Pencil, Trash2, User, Loader2, Calendar, 
+  Phone, ChevronRight, AlertCircle, X,
+  Database
 } from 'lucide-react';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, deletePatient, saveStatus, lastErrorMessage, clearError } = useHospital();
+  const { patients, addPatient, updatePatient, deletePatient, lastErrorMessage, clearError } = useHospital();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,7 +36,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     condition: Condition.Piles 
   });
 
-  // Auto-calculate age from DOB
   useEffect(() => {
     if (formData.dob) {
       const birth = new Date(formData.dob);
@@ -65,7 +64,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     clearError();
 
     if (!editingId && (!formData.id || formData.id.trim().length === 0)) {
-        setLocalError("Please provide a File Registration ID in Step 2.");
+        setLocalError("Please provide a File Registration ID.");
         return;
     }
 
@@ -89,11 +88,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       setShowForm(false);
       resetForm();
     } catch (err: any) {
-      console.error("Submission failed:", err);
-      const errorMessage = err instanceof Error ? err.message : 
-                          (typeof err === 'string' ? err : 
-                          (err?.message ? err.message : "Submission failed. Check your database setup."));
-      setLocalError(errorMessage);
+      setLocalError(err.message || "Submission failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,7 +102,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     setEditingId(null);
     setStep(1);
     setLocalError(null);
-    clearError();
   };
 
   const handleEdit = (p: Patient) => {
@@ -140,6 +134,23 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Persistent Schema Warning */}
+      {lastErrorMessage?.includes('column is missing') && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-4">
+           <Database className="w-6 h-6 text-amber-600 flex-shrink-0" />
+           <div className="flex-1">
+             <h4 className="text-sm font-bold text-amber-800">Database Schema Fix Required</h4>
+             <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+               The DOP (Entry Date) feature requires a new column in your Supabase table. 
+               Go to the <b>SQL Editor</b> in Supabase and run this command:
+             </p>
+             <code className="block mt-2 p-2 bg-amber-100 rounded text-[10px] font-mono font-bold text-amber-900 border border-amber-200">
+               ALTER TABLE himas_data ADD COLUMN entry_date DATE;
+             </code>
+           </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -163,7 +174,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       {showForm && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
             <div className="px-8 py-6 bg-slate-50 border-b flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="bg-hospital-100 p-2.5 rounded-2xl">
@@ -181,9 +191,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
             <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-8 space-y-8">
               {step === 1 ? (
-                /* STEP 1: Details Collection */
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in slide-in-from-left-4 duration-300">
-                  {/* Personal Info */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-hospital-600 text-white flex items-center justify-center text-[10px] font-bold">1</div>
@@ -224,7 +232,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Contact Info */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-hospital-600 text-white flex items-center justify-center text-[10px] font-bold">2</div>
@@ -263,7 +270,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Referral Info */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-hospital-600 text-white flex items-center justify-center text-[10px] font-bold">3</div>
@@ -291,7 +297,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* STEP 2: ID Assignment & Confirmation */
                 <div className="max-w-3xl mx-auto space-y-10 animate-in slide-in-from-right-4 duration-300">
                   <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
                     <div className="space-y-1">
@@ -328,24 +333,16 @@ export const FrontOfficeDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Status / Error Messages */}
-              {(localError || lastErrorMessage) && (
+              {localError && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-4 text-red-700 animate-in shake-in duration-300">
                   <AlertCircle className="w-6 h-6 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-bold">Registration Alert</p>
-                    <p className="font-medium opacity-80 leading-relaxed mt-1">{localError || lastErrorMessage}</p>
-                    {lastErrorMessage?.includes('entry_date') && (
-                      <div className="mt-3 p-3 bg-red-100/50 rounded-xl border border-red-200">
-                         <p className="text-xs font-bold text-red-900 mb-1">Administrator Fix Needed:</p>
-                         <code className="text-[10px] bg-white px-2 py-1 rounded block">ALTER TABLE himas_data ADD COLUMN entry_date DATE;</code>
-                      </div>
-                    )}
+                    <p className="font-bold">Error</p>
+                    <p className="font-medium opacity-80 mt-1">{localError}</p>
                   </div>
                 </div>
               )}
 
-              {/* Form Actions */}
               <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <button type="button" onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="w-full sm:w-auto text-slate-400 font-bold px-8 py-3 hover:text-slate-600 transition-colors">
                   {step === 1 ? 'Cancel' : 'Back to Step 1'}
@@ -358,11 +355,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Saving to Cloud...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
                     <>
-                      <span>{step === 1 ? 'Next Step' : (editingId ? 'Update Profile' : 'Complete Registration')}</span>
+                      <span>{step === 1 ? 'Next Step' : (editingId ? 'Update Record' : 'Register Patient')}</span>
                       <ChevronRight className="w-5 h-5" />
                     </>
                   )}
@@ -373,7 +370,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Patients Table */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -429,14 +425,8 @@ export const FrontOfficeDashboard: React.FC = () => {
               ))}
               {filteredPatients.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-20 text-center">
-                    <div className="max-w-xs mx-auto text-slate-300">
-                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Search className="w-8 h-8 opacity-20" />
-                       </div>
-                       <p className="text-sm font-bold text-slate-400">No Patient Matches</p>
-                       <p className="text-xs font-medium text-slate-300 mt-1">Try searching for a different name or file ID.</p>
-                    </div>
+                  <td colSpan={6} className="p-20 text-center text-slate-400 text-sm italic">
+                    No matching patient records found.
                   </td>
                 </tr>
               )}
