@@ -2,11 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Clock, Database, AlertCircle } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Clock, Database, AlertCircle, Loader2 } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [assessment, setAssessment] = useState<Partial<DoctorAssessment>>({
     quickCode: SurgeonCode.S1,
@@ -54,11 +55,16 @@ export const DoctorDashboard: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedPatient && assessment.doctorSignature) {
-      await updateDoctorAssessment(selectedPatient.id, {
-        ...assessment as DoctorAssessment,
-        assessedAt: new Date().toISOString()
-      });
-      setSelectedPatient(null);
+      setIsSaving(true);
+      try {
+        await updateDoctorAssessment(selectedPatient.id, {
+          ...assessment as DoctorAssessment,
+          assessedAt: new Date().toISOString()
+        });
+        setSelectedPatient(null);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -68,48 +74,36 @@ export const DoctorDashboard: React.FC = () => {
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
       <div className="w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-           <h3 className="font-bold text-gray-700 flex items-center gap-2">
-             <Stethoscope className="w-5 h-5 text-hospital-600" /> Patient Queue
+        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+           <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm">
+             <Stethoscope className="w-5 h-5 text-hospital-600" /> Queue ({queue.length})
            </h3>
-           <div className="flex gap-4 mt-2 text-xs">
-             <span className="text-orange-600 font-semibold">{queue.length} Pending</span>
-             <span className="text-green-600 font-semibold">{completed.length} Completed</span>
-           </div>
+           <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase">{completed.length} Done</span>
         </div>
         <div className="overflow-y-auto flex-1 p-2 space-y-2">
-          {queue.length === 0 && <div className="p-4 text-center text-gray-400">Queue is empty</div>}
+          {queue.length === 0 && <div className="p-10 text-center text-gray-400 text-xs italic">All patients assessed!</div>}
           {queue.map(p => (
             <div 
               key={p.id} 
               onClick={() => setSelectedPatient(p)}
-              className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50' : 'border-gray-200 bg-white'}`}
+              className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50' : 'border-gray-200 bg-white hover:border-hospital-200'}`}
             >
               <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-bold text-gray-800">{p.name}</div>
-                  <div className="text-xs text-gray-500">{p.age} / {p.gender}</div>
-                </div>
-                <div className="text-xs font-mono text-gray-400">{p.id}</div>
+                <div className="font-bold text-gray-800 text-sm">{p.name}</div>
+                <div className="text-[10px] font-mono text-gray-400">{p.id}</div>
               </div>
-              <div className="mt-2 flex gap-2">
-                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded flex items-center gap-1">
-                  <Activity className="w-3 h-3" /> {p.condition}
-                </span>
-              </div>
+              <div className="text-[10px] text-gray-500 mt-1">{p.age} yrs • {p.gender} • {p.condition}</div>
             </div>
           ))}
-          {completed.length > 0 && <div className="mt-6 mb-2 text-xs font-bold text-gray-400 uppercase px-2">Recently Completed</div>}
-          {completed.slice(0, 5).map(p => (
+          {completed.length > 0 && <div className="mt-6 mb-2 text-[10px] font-bold text-gray-400 uppercase px-2">Recently Completed</div>}
+          {completed.slice(0, 10).map(p => (
             <div 
               key={p.id}
               onClick={() => setSelectedPatient(p)} 
-              className={`p-3 rounded-lg border border-gray-100 bg-gray-50 opacity-70 hover:opacity-100 cursor-pointer ${selectedPatient?.id === p.id ? 'ring-2 ring-hospital-200' : ''}`}
+              className={`p-3 rounded-lg border border-gray-100 bg-gray-50 flex justify-between items-center opacity-70 hover:opacity-100 cursor-pointer ${selectedPatient?.id === p.id ? 'ring-2 ring-hospital-200' : ''}`}
             >
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-600">{p.name}</span>
-                <Check className="w-4 h-4 text-green-500" />
-              </div>
+              <span className="text-xs font-medium text-gray-600">{p.name}</span>
+              <Check className="w-3.5 h-3.5 text-green-500" />
             </div>
           ))}
         </div>
@@ -120,153 +114,91 @@ export const DoctorDashboard: React.FC = () => {
           <>
             <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-gray-800">Medical Evaluation</h2>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-2">
-                  <span className="flex items-center gap-1"><User className="w-3 h-3" /> {selectedPatient.name}, {selectedPatient.age} yrs</span>
-                  <span className="flex items-center gap-1 text-hospital-700 font-medium bg-hospital-50 px-2 py-0.5 rounded-full"><Activity className="w-3 h-3" /> {selectedPatient.condition}</span>
+                <h2 className="text-xl font-bold text-gray-800">Clinical Evaluation</h2>
+                <div className="text-sm text-gray-500 mt-1">
+                  {selectedPatient.name} ({selectedPatient.id})
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">File ID</div>
-                <div className="font-mono text-lg font-bold text-hospital-600">{selectedPatient.id}</div>
+              <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter ${selectedPatient.doctorAssessment ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {selectedPatient.doctorAssessment ? 'Assessment Done' : 'Evaluation Required'}
               </div>
             </div>
 
-            {/* Persistent Database Warning for Doctor */}
-            {lastErrorMessage?.includes('DATABASE ALERT') && (
-              <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 text-amber-800 text-xs">
-                 <Database className="w-4 h-4" />
-                 <span className="font-bold">NOTICE: Assessments won't save permanently. Admin must add 'doctor_assessment' column to Supabase.</span>
-              </div>
-            )}
-            
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-8">
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                    <Stethoscope className="w-5 h-5 text-hospital-500" /> Clinical Assessment
-                  </h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-2">Surgeon Quick Code</label>
-                     <div className="space-y-2">
-                       {Object.values(SurgeonCode).map(code => (
-                         <label key={code} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${assessment.quickCode === code ? 'bg-blue-50 border-blue-500 shadow-sm' : 'hover:bg-gray-50'}`}>
-                           <input 
-                             type="radio" 
-                             name="quickCode" 
-                             checked={assessment.quickCode === code}
-                             onChange={() => handleQuickCodeChange(code)}
-                             className="text-hospital-600 focus:ring-hospital-500"
-                           />
-                           <span className="ml-3 text-sm font-medium text-gray-900">{code}</span>
-                         </label>
-                       ))}
-                     </div>
-                   </div>
-                   
-                   {!isMedicationOnly ? (
-                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Pain Severity</label>
-                       <div className="flex flex-col gap-2">
-                         {Object.values(PainSeverity).map(severity => (
-                           <button
-                             key={severity}
-                             type="button"
-                             onClick={() => setAssessment({...assessment, painSeverity: severity})}
-                             className={`w-full py-3 rounded-lg border text-sm font-medium transition-all ${
-                               assessment.painSeverity === severity
-                                 ? severity === 'High' ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
-                                 : severity === 'Moderate' ? 'bg-orange-50 border-orange-500 text-orange-700 shadow-sm'
-                                 : 'bg-green-50 border-green-500 text-green-700 shadow-sm'
-                                 : 'hover:bg-gray-50 border-gray-200 text-gray-600'
-                             }`}
-                           >
-                             {severity}
-                           </button>
-                         ))}
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="flex items-center justify-center border-2 border-dashed border-gray-100 rounded-xl p-6 bg-gray-50/50">
-                        <div className="text-center">
-                          <Activity className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pain Assessment Hidden for M1</p>
-                        </div>
-                     </div>
-                   )}
+              <section className="space-y-6">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Treatment Code</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.values(SurgeonCode).map(code => (
+                    <label key={code} className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${assessment.quickCode === code ? 'border-hospital-500 bg-hospital-50 shadow-sm' : 'border-gray-100 hover:border-gray-200'}`}>
+                      <input 
+                        type="radio" 
+                        name="quickCode" 
+                        checked={assessment.quickCode === code}
+                        onChange={() => handleQuickCodeChange(code)}
+                        className="text-hospital-600 w-4 h-4"
+                      />
+                      <span className="ml-3 text-sm font-bold text-gray-700">{code}</span>
+                    </label>
+                  ))}
                 </div>
               </section>
 
               {!isMedicationOnly && (
-                <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                <section className="animate-in fade-in slide-in-from-top-4 duration-300 space-y-8">
                   <hr className="border-gray-100" />
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                    <ChevronRight className="w-5 h-5 text-hospital-500" /> Conversion Indicators
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Surgical Assessment</h3>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500">Pain Severity</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {Object.values(PainSeverity).map(s => (
+                        <button key={s} type="button" onClick={() => setAssessment({...assessment, painSeverity: s})} className={`py-2 text-xs font-bold rounded-lg border transition-all ${assessment.painSeverity === s ? 'bg-hospital-600 border-hospital-600 text-white' : 'bg-white text-gray-400 hover:border-gray-300'}`}>{s}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Affordability</label>
-                      <select 
-                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500"
-                        value={assessment.affordability}
-                        onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}
-                      >
+                      <label className="block text-xs font-bold text-gray-500 mb-2">Affordability</label>
+                      <select className="w-full border rounded-lg p-2.5 text-sm font-medium" value={assessment.affordability} onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}>
                         {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Readiness</label>
-                      <select 
-                        className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-hospital-500"
-                        value={assessment.conversionReadiness}
-                        onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}
-                      >
+                      <label className="block text-xs font-bold text-gray-500 mb-2">Readiness</label>
+                      <select className="w-full border rounded-lg p-2.5 text-sm font-medium" value={assessment.conversionReadiness} onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}>
                         {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Tentative Surgery Date</label>
-                      <input 
-                        type="date" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-hospital-500"
-                        value={assessment.tentativeSurgeryDate}
-                        onChange={e => setAssessment({...assessment, tentativeSurgeryDate: e.target.value})}
-                      />
                     </div>
                   </div>
                 </section>
               )}
 
-              <div className="bg-gray-50 p-6 rounded-lg border border-dashed border-gray-300">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Digital Signature</label>
-                <input 
-                  type="text" 
-                  placeholder="Type Doctor Name to Sign"
-                  className="w-full border-b-2 border-gray-400 bg-transparent py-2 text-xl font-serif italic focus:outline-none focus:border-hospital-600"
-                  value={assessment.doctorSignature}
-                  onChange={e => setAssessment({...assessment, doctorSignature: e.target.value})}
-                  required
-                />
-              </div>
+              <section className="pt-8 border-t border-gray-100">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 border-dashed">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Physician Signature</label>
+                  <input 
+                    required type="text" placeholder="Full Professional Name"
+                    className="w-full bg-transparent border-b-2 border-slate-300 py-2 text-2xl font-serif italic outline-none focus:border-hospital-600"
+                    value={assessment.doctorSignature}
+                    onChange={e => setAssessment({...assessment, doctorSignature: e.target.value})}
+                  />
+                </div>
+              </section>
 
-              <div className="flex justify-end gap-4">
-                <button type="button" onClick={() => setSelectedPatient(null)} className="px-6 py-2 text-gray-600 font-bold">Cancel</button>
-                <button 
-                  type="submit" 
-                  className="px-8 py-2.5 bg-hospital-600 text-white rounded-lg hover:bg-hospital-700 shadow-lg font-bold flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" /> Save Assessment
+              <div className="flex justify-end gap-3 pt-6">
+                <button type="button" onClick={() => setSelectedPatient(null)} className="px-6 py-2 text-gray-400 font-bold text-sm">Cancel</button>
+                <button type="submit" disabled={isSaving || !assessment.doctorSignature} className="px-10 py-3 bg-hospital-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-hospital-100 disabled:opacity-50">
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Complete Assessment
                 </button>
               </div>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-             <Stethoscope className="w-16 h-16 mb-4 text-gray-200" />
-             <p className="font-medium text-lg">Select a patient to start evaluation</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
+             <Stethoscope className="w-20 h-20 mb-4 opacity-20" />
+             <p className="font-bold text-lg">Select patient to begin evaluation</p>
           </div>
         )}
       </div>
