@@ -135,17 +135,18 @@ export const FrontOfficeDashboard: React.FC = () => {
       </div>
 
       {/* Persistent Schema Warning */}
-      {lastErrorMessage?.includes('column is missing') && (
+      {lastErrorMessage?.includes('ALERT') && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-4">
            <Database className="w-6 h-6 text-amber-600 flex-shrink-0" />
            <div className="flex-1">
-             <h4 className="text-sm font-bold text-amber-800">Database Schema Fix Required</h4>
+             <h4 className="text-sm font-bold text-amber-800">Database Setup Required</h4>
              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-               The DOP (Entry Date) feature requires a new column in your Supabase table. 
-               Go to the <b>SQL Editor</b> in Supabase and run this command:
+               Run the following command in your <b>Supabase SQL Editor</b> to enable status tracking and assessments:
              </p>
-             <code className="block mt-2 p-2 bg-amber-100 rounded text-[10px] font-mono font-bold text-amber-900 border border-amber-200">
-               ALTER TABLE himas_data ADD COLUMN entry_date DATE;
+             <code className="block mt-2 p-3 bg-amber-100 rounded text-[10px] font-mono font-bold text-amber-900 border border-amber-200 whitespace-pre-wrap">
+{`ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS entry_date DATE;
+ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS doctor_assessment JSONB;
+ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
              </code>
            </div>
         </div>
@@ -192,6 +193,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-8 space-y-8">
               {step === 1 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in slide-in-from-left-4 duration-300">
+                  {/* ... Same form fields ... */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-hospital-600 text-white flex items-center justify-center text-[10px] font-bold">1</div>

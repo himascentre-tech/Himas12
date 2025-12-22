@@ -48,6 +48,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
   const cachedHospitalId = useRef<string | null>(null);
+  const pollingInterval = useRef<number | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
     if (role) {
@@ -61,6 +62,29 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const clearError = () => setLastErrorMessage(null);
   const forceStopLoading = () => setIsLoading(false);
+
+  // Helper to map DB snake_case columns to App camelCase properties
+  const mapPatientFromDB = (item: any): Patient => {
+    return {
+      ...item,
+      // Handle potential snake_case from DB mapping back to camelCase
+      doctorAssessment: item.doctor_assessment || item.doctorAssessment,
+      packageProposal: item.package_proposal || item.packageProposal,
+      // Fallback for UI if entry_date is null
+      entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+      age: item.age ?? 0 
+    };
+  };
+
+  // Helper to map App camelCase properties to DB snake_case columns
+  const mapPatientToDB = (patient: any) => {
+    const { doctorAssessment, packageProposal, ...rest } = patient;
+    return {
+      ...rest,
+      doctor_assessment: doctorAssessment,
+      package_proposal: packageProposal
+    };
+  };
 
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
@@ -83,6 +107,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const performSafeUpsert = async (payload: any, isUpdate = false) => {
     const table = 'himas_data';
+    const dbPayload = mapPatientToDB(payload);
     
     const runQuery = async (p: any) => {
       return isUpdate 
@@ -90,20 +115,20 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         : supabase.from(table).insert(p).select().single();
     };
 
-    let result = await runQuery(payload);
+    let result = await runQuery(dbPayload);
 
     if (result.error) {
       const msg = result.error.message || "";
       const code = result.error.code;
 
-      // Handle missing 'entry_date' column specifically (Postgres 42703 is undefined_column)
+      // Check for missing columns
       if (msg.includes('entry_date') || msg.includes('column') || code === '42703') {
-         console.warn("Attempting recovery: Saving without 'entry_date' column...");
-         const { entry_date, ...fallbackPayload } = payload;
+         console.warn("Retrying without entry_date column...");
+         const { entry_date, ...fallbackPayload } = dbPayload;
          const retryResult = await runQuery(fallbackPayload);
          
          if (!retryResult.error) {
-            setLastErrorMessage(`CRITICAL: 'entry_date' column is missing in your Database. Please run the ALTER TABLE SQL provided in the warning below.`);
+            setLastErrorMessage(`DATABASE ALERT: Columns missing. Run SQL: ALTER TABLE himas_data ADD COLUMN entry_date DATE; ALTER TABLE himas_data ADD COLUMN doctor_assessment JSONB; ALTER TABLE himas_data ADD COLUMN package_proposal JSONB;`);
             return retryResult;
          }
       }
@@ -112,14 +137,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return result;
   };
 
-  const loadData = useCallback(async () => {
-    setSaveStatus('saving');
-    setIsLoading(true);
+  const loadData = useCallback(async (isBackground = false) => {
+    if (!isBackground) setSaveStatus('saving');
+    if (!isBackground) setIsLoading(true);
 
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) {
-        setIsLoading(false);
+        if (!isBackground) setIsLoading(false);
         setSaveStatus('saved');
         return;
       }
@@ -131,31 +156,36 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (error) throw error;
       
-      const sortedData = (data || []).map(item => ({
-        ...item,
-        // Fallback for UI if entry_date column exists but is null, OR if column is missing entirely from query
-        entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
-        age: item.age ?? 0 
-      })).sort((a, b) => {
+      const mappedData = (data || []).map(mapPatientFromDB).sort((a, b) => {
         const dateA = new Date(a.entry_date).getTime();
         const dateB = new Date(b.entry_date).getTime();
         return dateB - dateA; 
       });
 
-      setPatients(sortedData);
-      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(sortedData));
+      setPatients(mappedData);
+      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(mappedData));
       setSaveStatus('saved');
       setLastSavedAt(new Date());
-      // Don't auto-clear the error if it's a schema warning to keep the user informed
-      if (!lastErrorMessage?.includes('column is missing')) setLastErrorMessage(null);
     } catch (e: any) {
       console.error("Sync Error:", e);
       setLastErrorMessage(e.message || "Database connection failed.");
       setSaveStatus('error');
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
-  }, [lastErrorMessage]);
+  }, []);
+
+  // Setup 10-second polling for real-time multi-user synchronization
+  useEffect(() => {
+    if (currentUserRole) {
+      pollingInterval.current = window.setInterval(() => {
+        loadData(true);
+      }, 10000);
+    } else {
+      if (pollingInterval.current) clearInterval(pollingInterval.current);
+    }
+    return () => { if (pollingInterval.current) clearInterval(pollingInterval.current); };
+  }, [currentUserRole, loadData]);
 
   useEffect(() => {
     let mounted = true;
@@ -205,11 +235,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data, error } = await performSafeUpsert(payload, false);
       if (error) throw new Error(error.message);
       
-      const newPatient = {
-        ...data,
-        entry_date: data.entry_date || (data.created_at ? data.created_at.split('T')[0] : payload.entry_date)
-      } as Patient;
-      
+      const newPatient = mapPatientFromDB(data);
       setPatients(prev => [newPatient, ...prev]);
       setSaveStatus('saved');
     } catch (err: any) {
@@ -227,11 +253,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
       if (error) throw new Error(error.message);
       
-      const savedPatient = {
-        ...data,
-        entry_date: data.entry_date || updatedPatient.entry_date
-      } as Patient;
-      
+      const savedPatient = mapPatientFromDB(data);
       setPatients(prev => prev.map(p => p.id === savedPatient.id ? savedPatient : p));
       setSaveStatus('saved');
     } catch (err: any) {
@@ -259,7 +281,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       currentUserRole, setCurrentUserRole, patients, addPatient, updatePatient, deletePatient,
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
-        if (p) await updatePatient({ ...p, doctorAssessment: ass });
+        if (p) {
+          // Optimistic local update to fix "still showing pending" immediately in current view
+          const optimisticPatient = { ...p, doctorAssessment: ass };
+          setPatients(prev => prev.map(item => item.id === pid ? optimisticPatient : item));
+          // Persist to DB
+          await updatePatient(optimisticPatient);
+        }
       }, 
       updatePackageProposal: async (pid, prop) => {
         const p = patients.find(p => p.id === pid);
@@ -267,7 +295,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       },
       getPatientById: (id: string) => patients.find(p => p.id === id),
       staffUsers, registerStaff: async () => {},
-      saveStatus, lastSavedAt, refreshData: loadData, 
+      saveStatus, lastSavedAt, refreshData: () => loadData(), 
       isLoading, isStaffLoaded: true, lastErrorMessage, clearError,
       forceStopLoading
     }}>
