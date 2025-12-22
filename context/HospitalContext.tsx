@@ -63,20 +63,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearError = () => setLastErrorMessage(null);
   const forceStopLoading = () => setIsLoading(false);
 
-  // Helper to map DB snake_case columns to App camelCase properties
   const mapPatientFromDB = (item: any): Patient => {
     return {
       ...item,
-      // Handle potential snake_case from DB mapping back to camelCase
-      doctorAssessment: item.doctor_assessment || item.doctorAssessment,
-      packageProposal: item.package_proposal || item.packageProposal,
-      // Fallback for UI if entry_date is null
+      doctorAssessment: item.doctor_assessment || item.doctorAssessment || null,
+      packageProposal: item.package_proposal || item.packageProposal || null,
       entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
       age: item.age ?? 0 
     };
   };
 
-  // Helper to map App camelCase properties to DB snake_case columns
   const mapPatientToDB = (patient: any) => {
     const { doctorAssessment, packageProposal, ...rest } = patient;
     return {
@@ -121,14 +117,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const msg = result.error.message || "";
       const code = result.error.code;
 
-      // Check for missing columns
-      if (msg.includes('entry_date') || msg.includes('column') || code === '42703') {
-         console.warn("Retrying without entry_date column...");
-         const { entry_date, ...fallbackPayload } = dbPayload;
-         const retryResult = await runQuery(fallbackPayload);
+      // Handle missing column errors (42703 is undefined_column)
+      if (msg.includes('column') || code === '42703') {
+         console.warn("Retrying save without newer schema columns...");
+         const { entry_date, doctor_assessment, package_proposal, ...minPayload } = dbPayload;
+         const retryResult = await runQuery(minPayload);
          
          if (!retryResult.error) {
-            setLastErrorMessage(`DATABASE ALERT: Columns missing. Run SQL: ALTER TABLE himas_data ADD COLUMN entry_date DATE; ALTER TABLE himas_data ADD COLUMN doctor_assessment JSONB; ALTER TABLE himas_data ADD COLUMN package_proposal JSONB;`);
+            setLastErrorMessage(`DATABASE ALERT: Your database is missing columns. Data like Doctor Assessments will NOT be saved until you run the SQL migration in Supabase.`);
             return retryResult;
          }
       }
@@ -167,20 +163,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (e: any) {
-      console.error("Sync Error:", e);
-      setLastErrorMessage(e.message || "Database connection failed.");
+      setLastErrorMessage(e.message || "Sync failed.");
       setSaveStatus('error');
     } finally {
       if (!isBackground) setIsLoading(false);
     }
   }, []);
 
-  // Setup 10-second polling for real-time multi-user synchronization
   useEffect(() => {
     if (currentUserRole) {
-      pollingInterval.current = window.setInterval(() => {
-        loadData(true);
-      }, 10000);
+      pollingInterval.current = window.setInterval(() => loadData(true), 10000);
     } else {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
     }
@@ -190,13 +182,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     let mounted = true;
     const init = async () => {
-      try {
-        const hospitalId = await getEffectiveHospitalId();
-        if (mounted && hospitalId) await loadData();
-        else if (mounted) setIsLoading(false);
-      } catch (err) {
-        if (mounted) setIsLoading(false);
-      }
+      const hospitalId = await getEffectiveHospitalId();
+      if (mounted && hospitalId) await loadData();
+      else if (mounted) setIsLoading(false);
     };
     init();
 
@@ -213,37 +201,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [loadData]);
-
-  const addPatient = async (patientData: Omit<Patient, 'created_at' | 'hospital_id'>) => {
-    setSaveStatus('saving');
-    try {
-      const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) throw new Error("Session expired.");
-
-      const payload = {
-        ...patientData,
-        id: String(patientData.id).trim().toUpperCase(),
-        age: Number(patientData.age) || 0,
-        hospital_id: hospitalId
-      };
-
-      const { data, error } = await performSafeUpsert(payload, false);
-      if (error) throw new Error(error.message);
-      
-      const newPatient = mapPatientFromDB(data);
-      setPatients(prev => [newPatient, ...prev]);
-      setSaveStatus('saved');
-    } catch (err: any) {
-      setLastErrorMessage(err.message || "Submit failed.");
-      setSaveStatus('error');
-      throw err;
-    }
-  };
 
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
@@ -263,29 +222,29 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const deletePatient = async (id: string) => {
-    setSaveStatus('saving');
-    try {
-      const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) return;
-      await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
-      setPatients(prev => prev.filter(p => p.id !== id));
-      setSaveStatus('saved');
-    } catch (err: any) {
-      setSaveStatus('error');
-    }
-  };
-
   return (
     <HospitalContext.Provider value={{
-      currentUserRole, setCurrentUserRole, patients, addPatient, updatePatient, deletePatient,
+      currentUserRole, setCurrentUserRole, patients, 
+      addPatient: async (patientData) => {
+        setSaveStatus('saving');
+        const hospitalId = await getEffectiveHospitalId();
+        const payload = { ...patientData, id: String(patientData.id).trim().toUpperCase(), hospital_id: hospitalId };
+        const { data, error } = await performSafeUpsert(payload, false);
+        if (error) throw new Error(error.message);
+        setPatients(prev => [mapPatientFromDB(data), ...prev]);
+        setSaveStatus('saved');
+      },
+      updatePatient,
+      deletePatient: async (id) => {
+        const hospitalId = await getEffectiveHospitalId();
+        await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+        setPatients(prev => prev.filter(p => p.id !== id));
+      },
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
         if (p) {
-          // Optimistic local update to fix "still showing pending" immediately in current view
           const optimisticPatient = { ...p, doctorAssessment: ass };
           setPatients(prev => prev.map(item => item.id === pid ? optimisticPatient : item));
-          // Persist to DB
           await updatePatient(optimisticPatient);
         }
       }, 
@@ -293,7 +252,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         const p = patients.find(p => p.id === pid);
         if (p) await updatePatient({ ...p, packageProposal: prop });
       },
-      getPatientById: (id: string) => patients.find(p => p.id === id),
+      getPatientById: (id) => patients.find(p => p.id === id),
       staffUsers, registerStaff: async () => {},
       saveStatus, lastSavedAt, refreshData: () => loadData(), 
       isLoading, isStaffLoaded: true, lastErrorMessage, clearError,
