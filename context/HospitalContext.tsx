@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
 import { supabase } from '../services/supabaseClient';
+import { syncToGoogleSheets } from '../services/googleSheetsService';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -165,7 +166,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const hospitalId = await getEffectiveHospitalId();
       const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
       if (error) throw error;
-      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapPatientFromDB(data) : p));
+      
+      const mapped = mapPatientFromDB(data);
+      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
+      
+      // Trigger Real-time Sheets Sync
+      syncToGoogleSheets(mapped).catch(console.error);
+      
       setSaveStatus('saved');
     } catch (err: any) {
       setSaveStatus('error');
@@ -180,7 +187,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         const hospitalId = await getEffectiveHospitalId();
         const { data, error } = await performSafeUpsert({ ...pd, hospital_id: hospitalId });
         if (error) throw error;
-        setPatients(prev => [mapPatientFromDB(data), ...prev]);
+        
+        const mapped = mapPatientFromDB(data);
+        setPatients(prev => [mapped, ...prev]);
+        
+        // Trigger Real-time Sheets Sync
+        syncToGoogleSheets(mapped).catch(console.error);
+        
         setSaveStatus('saved');
       },
       deletePatient: async (id) => {
@@ -191,7 +204,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
         if (p) {
-          // OPTIMISTIC UPDATE: Change local state immediately to clear "Pending" status in UI
           const updated = { ...p, doctorAssessment: ass };
           setPatients(prev => prev.map(item => item.id === pid ? updated : item));
           await updatePatient(updated);
