@@ -1,60 +1,22 @@
 
+import { Patient } from "../types";
+
 /**
  * Google Sheets Real-Time Sync Service
  * 
- * SETUP INSTRUCTIONS:
- * 1. Open your Google Sheet.
- * 2. Go to Extensions > Apps Script.
- * 3. Delete any code there and paste the following script:
- * 
- * function doPost(e) {
- *   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
- *   var data = JSON.parse(e.postData.contents);
- *   
- *   // Get headers from the first row
- *   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
- *   
- *   // Find if row exists (by ID) to update, otherwise append
- *   var idIndex = headers.indexOf("id");
- *   var rowIndex = -1;
- *   
- *   if (idIndex > -1 && sheet.getLastRow() > 1) {
- *     var ids = sheet.getRange(2, idIndex + 1, sheet.getLastRow() - 1, 1).getValues();
- *     for (var i = 0; i < ids.length; i++) {
- *       if (ids[i][0] == data.id) { 
- *         rowIndex = i + 2; 
- *         break; 
- *       }
- *     }
- *   }
- *   
- *   // Map data to the correct columns based on headers
- *   var newRow = headers.map(function(h) {
- *     return data[h] || "";
- *   });
- *   
- *   if (rowIndex > -1) {
- *     sheet.getRange(rowIndex, 1, 1, headers.length).setValues([newRow]);
- *   } else {
- *     sheet.appendRow(newRow);
- *   }
- *   
- *   return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
- * }
- * 
- * 4. Click 'Deploy' > 'New deployment' > 'Web app'.
- * 5. Set 'Execute as' to 'Me' and 'Who has access' to 'Anyone'.
- * 6. The URL below should match your deployed Web App URL.
+ * NOTE: Using mode: 'no-cors' is necessary for Google Apps Script to avoid 
+ * CORS preflight (OPTIONS) requests which Apps Script doesn't support.
+ * In this mode, the response cannot be read, but the data is sent successfully.
  */
-
-import { Patient } from "../types";
-
 export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => {
-  // Using the specific URL provided by the user
   const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwJas8BjJINnVIgUq8MacjBkTk03RGr3xjh0Dmi_zGlXVreQvamlwa6ItTSwlSLGpHo/exec';
   
+  if (!WEBHOOK_URL) {
+    console.error("❌ Google Sheets Sync: Missing Webhook URL.");
+    return false;
+  }
+
   try {
-    // Flatten the data for Google Sheets consumption
     const payload = {
       id: patient.id,
       name: patient.name,
@@ -62,44 +24,44 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       age: patient.age,
       gender: patient.gender,
       mobile: patient.mobile,
-      occupation: patient.occupation,
+      occupation: patient.occupation || "N/A",
       condition: patient.condition,
       insurance: patient.hasInsurance,
       insurance_name: patient.insuranceName || "N/A",
       source: patient.source,
       
       // Doctor Assessment Fields
-      doctor_code: patient.doctorAssessment?.quickCode || "",
-      pain_severity: patient.doctorAssessment?.painSeverity || "",
-      affordability: patient.doctorAssessment?.affordability || "",
-      readiness: patient.doctorAssessment?.conversionReadiness || "",
-      surgery_date: patient.doctorAssessment?.tentativeSurgeryDate || "",
-      doctor_signature: patient.doctorAssessment?.doctorSignature || "",
+      doctor_code: patient.doctorAssessment?.quickCode || "N/A",
+      pain_severity: patient.doctorAssessment?.painSeverity || "N/A",
+      affordability: patient.doctorAssessment?.affordability || "N/A",
+      readiness: patient.doctorAssessment?.conversionReadiness || "N/A",
+      surgery_date: patient.doctorAssessment?.tentativeSurgeryDate || "N/A",
+      doctor_signature: patient.doctorAssessment?.doctorSignature || "N/A",
       
       // Package Team Fields
-      decision_pattern: patient.packageProposal?.decisionPattern || "",
-      objection: patient.packageProposal?.objectionIdentified || "",
-      strategy: patient.packageProposal?.counselingStrategy || "",
-      follow_up: patient.packageProposal?.followUpDate || "",
+      decision_pattern: patient.packageProposal?.decisionPattern || "N/A",
+      objection: patient.packageProposal?.objectionIdentified || "N/A",
+      strategy: patient.packageProposal?.counselingStrategy || "N/A",
+      follow_up: patient.packageProposal?.followUpDate || "N/A",
       
       last_updated: new Date().toISOString()
     };
 
-    // Google Apps Script requires 'no-cors' mode for simple POST triggers via fetch
-    // because it handles redirects that are often blocked in standard CORS mode.
+    console.log("📤 Attempting to sync to Google Sheets:", payload);
+
+    // We send as a string. In 'no-cors' mode, we can't set Content-Type to application/json,
+    // but Apps Script's e.postData.contents will still contain this string.
     await fetch(WEBHOOK_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      cache: 'no-cache',
       body: JSON.stringify(payload),
     });
 
-    console.log(`%c📊 Google Sheets Sync: Data pushed for ${patient.name}`, "color: #10b981; font-weight: bold;");
+    console.log(`%c✅ Sync Triggered: ${patient.name} (${patient.id})`, "color: #10b981; font-weight: bold;");
     return true;
   } catch (error) {
-    console.error("Google Sheets Sync Error:", error);
+    console.error("❌ Google Sheets Sync Failed:", error);
     return false;
   }
 };

@@ -63,20 +63,24 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearError = () => setLastErrorMessage(null);
   const forceStopLoading = () => setIsLoading(false);
 
-  const mapPatientFromDB = (item: any): Patient => ({
-    ...item,
-    doctorAssessment: item.doctor_assessment || item.doctorAssessment || null,
-    packageProposal: item.package_proposal || item.packageProposal || null,
-    entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
-    age: item.age ?? 0 
-  });
+  const mapPatientFromDB = (item: any): Patient | null => {
+    if (!item) return null;
+    return {
+      ...item,
+      doctorAssessment: item.doctor_assessment || item.doctorAssessment || null,
+      packageProposal: item.package_proposal || item.packageProposal || null,
+      entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+      age: Number(item.age) || 0 
+    };
+  };
 
   const mapPatientToDB = (patient: any) => {
     const { doctorAssessment, packageProposal, ...rest } = patient;
     return {
       ...rest,
-      doctor_assessment: doctorAssessment,
-      package_proposal: packageProposal
+      doctor_assessment: doctorAssessment || null,
+      package_proposal: packageProposal || null,
+      age: Number(rest.age) || 0
     };
   };
 
@@ -107,12 +111,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const result = await query.select().single();
 
-    if (result.error && (result.error.code === '42703' || result.error.message.includes('column'))) {
-      const { entry_date, doctor_assessment, package_proposal, ...fallback } = dbPayload;
-      setLastErrorMessage(`DATABASE ALERT: Columns missing. Run SQL in Supabase: ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS doctor_assessment JSONB;`);
-      return isUpdate 
-        ? supabase.from('himas_data').update(fallback).eq('id', fallback.id).select().single()
-        : supabase.from('himas_data').insert(fallback).select().single();
+    if (result.error) {
+      console.error("Supabase Operation Error:", result.error);
+      if (result.error.code === '42703' || result.error.message.includes('column')) {
+        setLastErrorMessage(`DATABASE ALERT: Columns missing. Check Supabase SQL Editor.`);
+      }
     }
     return result;
   };
@@ -135,14 +138,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (error) throw error;
       
-      const mapped = (data || []).map(mapPatientFromDB).sort((a, b) => 
-        new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime()
-      );
+      const mapped = (data || [])
+        .map(mapPatientFromDB)
+        .filter((p): p is Patient => p !== null)
+        .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
 
       setPatients(mapped);
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (e: any) {
+      console.error("Data Loading Error:", e);
       setLastErrorMessage(e.message || "Fetch failed.");
       setSaveStatus('error');
     } finally {
@@ -168,13 +173,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (error) throw error;
       
       const mapped = mapPatientFromDB(data);
-      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
-      
-      // Trigger Real-time Sheets Sync
-      syncToGoogleSheets(mapped).catch(console.error);
+      if (mapped) {
+        setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
+        syncToGoogleSheets(mapped).catch(e => console.error("Async Sync Error:", e));
+      }
       
       setSaveStatus('saved');
     } catch (err: any) {
+      console.error("Update Error:", err);
       setSaveStatus('error');
     }
   };
@@ -184,34 +190,44 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       currentUserRole, setCurrentUserRole, patients, updatePatient,
       addPatient: async (pd) => {
         setSaveStatus('saving');
-        const hospitalId = await getEffectiveHospitalId();
-        const { data, error } = await performSafeUpsert({ ...pd, hospital_id: hospitalId });
-        if (error) throw error;
-        
-        const mapped = mapPatientFromDB(data);
-        setPatients(prev => [mapped, ...prev]);
-        
-        // Trigger Real-time Sheets Sync
-        syncToGoogleSheets(mapped).catch(console.error);
-        
-        setSaveStatus('saved');
+        try {
+          const hospitalId = await getEffectiveHospitalId();
+          const { data, error } = await performSafeUpsert({ ...pd, hospital_id: hospitalId });
+          if (error) throw error;
+          
+          const mapped = mapPatientFromDB(data);
+          if (mapped) {
+            setPatients(prev => [mapped, ...prev]);
+            syncToGoogleSheets(mapped).catch(e => console.error("Async Sync Error:", e));
+          }
+          setSaveStatus('saved');
+        } catch (err) {
+          console.error("Add Patient Error:", err);
+          setSaveStatus('error');
+        }
       },
       deletePatient: async (id) => {
-        const hospitalId = await getEffectiveHospitalId();
-        await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
-        setPatients(prev => prev.filter(p => p.id !== id));
+        try {
+          const hospitalId = await getEffectiveHospitalId();
+          await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+          setPatients(prev => prev.filter(p => p.id !== id));
+        } catch (err) {
+          console.error("Delete Error:", err);
+        }
       },
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
         if (p) {
           const updated = { ...p, doctorAssessment: ass };
-          setPatients(prev => prev.map(item => item.id === pid ? updated : item));
           await updatePatient(updated);
         }
       }, 
       updatePackageProposal: async (pid, prop) => {
         const p = patients.find(p => p.id === pid);
-        if (p) await updatePatient({ ...p, packageProposal: prop });
+        if (p) {
+          const updated = { ...p, packageProposal: prop };
+          await updatePatient(updated);
+        }
       },
       getPatientById: (id) => patients.find(p => p.id === id),
       staffUsers, registerStaff: async () => {},
