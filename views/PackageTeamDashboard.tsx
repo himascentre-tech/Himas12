@@ -1,10 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, Role, SurgeonCode, ProposalStatus } from '../types';
-import { Briefcase, Calendar, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock, Filter, Search, ArrowRight, XCircle, Trophy, History } from 'lucide-react';
+import { Patient, PackageProposal, Role, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
+import { Briefcase, Calendar, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock, Filter, Search, ArrowRight, XCircle, Trophy, History, X, Download, FileSpreadsheet } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
@@ -14,7 +13,12 @@ export const PackageTeamDashboard: React.FC = () => {
 
   // --- Counseling Dashboard State ---
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [counselingFilter, setCounselingFilter] = useState<'PENDING' | 'DUE_FOLLOWUPS' | 'CONVERTED' | 'ALL_ACTIVE'>('DUE_FOLLOWUPS');
+  const [counselingFilter, setCounselingFilter] = useState<'PENDING' | 'DUE_FOLLOWUPS' | 'CONVERTED' | 'LOST_LIST' | 'ALL_ACTIVE'>('DUE_FOLLOWUPS');
+  
+  // New Date Range States for per-view filtering
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
   const [aiLoading, setAiLoading] = useState(false);
   const [proposal, setProposal] = useState<Partial<PackageProposal>>({
     decisionPattern: 'Standard',
@@ -39,32 +43,79 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
-      // Only surgical candidates (S1)
+      // Only surgical candidates (S1) for these pipelines
       if (!p.doctorAssessment || p.doctorAssessment.quickCode === SurgeonCode.M1) return false;
 
       const status = p.packageProposal?.status || ProposalStatus.Pending;
+      let matchesTab = false;
+      let targetDate = '';
 
+      // 1. Tab Logic
       if (counselingFilter === 'PENDING') {
-        return status === ProposalStatus.Pending;
+        matchesTab = status === ProposalStatus.Pending;
+        targetDate = p.entry_date; // Filter by DOP
+      } else if (counselingFilter === 'DUE_FOLLOWUPS') {
+        matchesTab = status === ProposalStatus.FollowUp && (p.packageProposal?.followUpDate || '') <= today;
+        targetDate = p.packageProposal?.followUpDate || ''; // Filter by Follow-up date
+      } else if (counselingFilter === 'CONVERTED') {
+        matchesTab = status === ProposalStatus.SurgeryFixed;
+        targetDate = p.packageProposal?.outcomeDate || ''; // Filter by Outcome date
+      } else if (counselingFilter === 'LOST_LIST') {
+        matchesTab = status === ProposalStatus.SurgeryLost;
+        targetDate = p.packageProposal?.outcomeDate || ''; // Filter by Outcome date
+      } else if (counselingFilter === 'ALL_ACTIVE') {
+        matchesTab = status === ProposalStatus.Pending || status === ProposalStatus.FollowUp;
+        targetDate = p.entry_date; // Filter by DOP
       }
-      if (counselingFilter === 'DUE_FOLLOWUPS') {
-        // Due today or overdue
-        return status === ProposalStatus.FollowUp && (p.packageProposal?.followUpDate || '') <= today;
-      }
-      if (counselingFilter === 'CONVERTED') {
-        return status === ProposalStatus.SurgeryFixed || status === ProposalStatus.SurgeryLost;
-      }
-      if (counselingFilter === 'ALL_ACTIVE') {
-        return status === ProposalStatus.Pending || status === ProposalStatus.FollowUp;
-      }
+
+      if (!matchesTab) return false;
+
+      // 2. Date Range Logic
+      if (startDate && targetDate < startDate) return false;
+      if (endDate && targetDate > endDate) return false;
+
       return true;
     }).sort((a, b) => {
-      // Sort due follow-ups by date (earliest first)
-      const dateA = a.packageProposal?.followUpDate || '9999-99-99';
-      const dateB = b.packageProposal?.followUpDate || '9999-99-99';
-      return dateA.localeCompare(dateB);
+      // Primary sort by date context
+      if (counselingFilter === 'DUE_FOLLOWUPS') {
+        const dateA = a.packageProposal?.followUpDate || '9999-99-99';
+        const dateB = b.packageProposal?.followUpDate || '9999-99-99';
+        return dateA.localeCompare(dateB);
+      }
+      return new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime();
     });
-  }, [patients, counselingFilter, today]);
+  }, [patients, counselingFilter, today, startDate, endDate]);
+
+  const handleDownloadCSV = () => {
+    if (filteredPatients.length === 0) return;
+
+    const headers = [
+      'File ID', 'Name', 'DOP', 'Age', 'Gender', 'Phone', 'Condition', 
+      'Procedure', 'Status', 'Follow-up Date', 'Outcome Date', 'Doctor Code'
+    ];
+
+    const rows = filteredPatients.map(p => {
+      let proc = p.doctorAssessment?.surgeryProcedure || '';
+      if (proc === SurgeryProcedure.Others && p.doctorAssessment?.otherSurgeryName) {
+        proc = `Other: ${p.doctorAssessment.otherSurgeryName}`;
+      }
+      return [
+        p.id, p.name, p.entry_date, p.age, p.gender, p.mobile, p.condition,
+        proc, p.packageProposal?.status || 'Pending',
+        p.packageProposal?.followUpDate || 'N/A',
+        p.packageProposal?.outcomeDate || 'N/A',
+        p.doctorAssessment?.quickCode || 'N/A'
+      ].map(cell => `"${cell}"`).join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `HIMAS_${counselingFilter}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
 
   const handlePatientSelect = (p: Patient) => {
     setSelectedPatient(p);
@@ -150,52 +201,109 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl border border-slate-100">
-            <div className="flex gap-2 overflow-x-auto w-full md:w-auto p-1">
-              <button
-                onClick={() => setCounselingFilter('PENDING')}
-                className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                  counselingFilter === 'PENDING' ? 'bg-amber-500 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border hover:bg-white'
-                }`}
-              >
-                <Clock className="w-4 h-4" /> New Candidates
-              </button>
-              <button
-                onClick={() => setCounselingFilter('DUE_FOLLOWUPS')}
-                className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                  counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border hover:bg-white'
-                }`}
-              >
-                <Calendar className="w-4 h-4" /> Due Follow-ups
-              </button>
-              <button
-                onClick={() => setCounselingFilter('CONVERTED')}
-                className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                  counselingFilter === 'CONVERTED' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border hover:bg-white'
-                }`}
-              >
-                <History className="w-4 h-4" /> Converted Cases
-              </button>
-              <button
-                onClick={() => setCounselingFilter('ALL_ACTIVE')}
-                className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                  counselingFilter === 'ALL_ACTIVE' ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border hover:bg-white'
-                }`}
-              >
-                <Filter className="w-4 h-4" /> All Active
-              </button>
+          <div className="flex flex-col gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex gap-2 overflow-x-auto p-1 items-center bg-slate-50 rounded-2xl border border-slate-100">
+                <button
+                  onClick={() => setCounselingFilter('PENDING')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+                    counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" /> New Candidates
+                </button>
+                <button
+                  onClick={() => setCounselingFilter('DUE_FOLLOWUPS')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+                    counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" /> Due Follow-ups
+                </button>
+                <button
+                  onClick={() => setCounselingFilter('CONVERTED')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+                    counselingFilter === 'CONVERTED' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" /> Surgery Fixed
+                </button>
+                <button
+                  onClick={() => setCounselingFilter('LOST_LIST')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+                    counselingFilter === 'LOST_LIST' ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'
+                  }`}
+                >
+                  <XCircle className="w-4 h-4" /> Surgery Lost List
+                </button>
+                
+                <div className="h-6 w-px bg-slate-200 mx-1" />
+                
+                <button
+                  onClick={() => setCounselingFilter('ALL_ACTIVE')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+                    counselingFilter === 'ALL_ACTIVE' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-white'
+                  }`}
+                >
+                  <Filter className="w-4 h-4" /> All Active
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleDownloadCSV}
+                  disabled={filteredPatients.length === 0}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-hospital-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-hospital-100 hover:bg-hospital-700 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  Download This List ({filteredPatients.length})
+                </button>
+              </div>
             </div>
-            <ExportButtons patients={patients} role="package_team" />
+
+            {/* Shared Date Filters per Tab */}
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-50">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {counselingFilter === 'PENDING' || counselingFilter === 'ALL_ACTIVE' ? 'Filter by DOP' : 
+                   counselingFilter === 'DUE_FOLLOWUPS' ? 'Filter by Follow-up' : 'Filter by Outcome Date'}:
+                </span>
+                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border">
+                  <input 
+                    type="date" 
+                    className="text-xs p-1 border-none bg-transparent outline-none font-bold text-slate-600"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                  />
+                  <span className="text-slate-300 text-xs">-</span>
+                  <input 
+                    type="date" 
+                    className="text-xs p-1 border-none bg-transparent outline-none font-bold text-slate-600"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                  />
+                  {(startDate || endDate) && (
+                    <button onClick={() => { setStartDate(''); setEndDate(''); }} className="p-1 hover:bg-white rounded-lg transition-colors ml-1">
+                      <X className="w-3 h-3 text-slate-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex h-[calc(100vh-280px)] gap-6">
+          <div className="flex h-[calc(100vh-320px)] gap-6">
             {/* Candidate List Side */}
             <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
               <div className="p-4 border-b bg-slate-50/50 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {counselingFilter === 'PENDING' ? 'Waiting for First Call' : counselingFilter === 'DUE_FOLLOWUPS' ? 'Priority Follow-ups' : counselingFilter === 'CONVERTED' ? 'Outcome Records' : 'Full Active Pipeline'}
+                  {counselingFilter === 'PENDING' ? 'New Registry' : 
+                   counselingFilter === 'DUE_FOLLOWUPS' ? 'Priority Pipeline' : 
+                   counselingFilter === 'CONVERTED' ? 'Success Records' :
+                   counselingFilter === 'LOST_LIST' ? 'Lost Pipeline' :
+                   'Full active list'}
                 </span>
-                <span className="bg-white border text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{filteredPatients.length}</span>
+                <span className="bg-white border text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{filteredPatients.length} Results</span>
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-3">
                 {filteredPatients.map(p => (
@@ -231,9 +339,9 @@ export const PackageTeamDashboard: React.FC = () => {
                          <Calendar className="w-3 h-3" /> {p.packageProposal.followUpDate === today ? 'Due Today' : p.packageProposal.followUpDate < today ? `Overdue: ${p.packageProposal.followUpDate}` : `Next: ${p.packageProposal.followUpDate}`}
                        </div>
                     )}
-                    {p.packageProposal?.outcomeDate && (p.packageProposal.status === ProposalStatus.SurgeryFixed || p.packageProposal.status === ProposalStatus.SurgeryLost) && (
+                    {(counselingFilter === 'CONVERTED' || counselingFilter === 'LOST_LIST') && p.packageProposal?.outcomeDate && (
                       <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
-                        <CheckCircle2 className="w-3 h-3" /> Outcome Date: {p.packageProposal.outcomeDate}
+                        <CheckCircle2 className="w-3 h-3" /> Outcome: {p.packageProposal.outcomeDate}
                       </div>
                     )}
                   </div>
@@ -241,7 +349,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 {filteredPatients.length === 0 && (
                   <div className="p-12 text-center">
                     <CheckCircle2 className="w-16 h-16 text-slate-100 mx-auto mb-4" />
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">All tasks completed</p>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No matching cases</p>
                   </div>
                 )}
               </div>
