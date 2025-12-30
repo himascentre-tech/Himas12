@@ -135,24 +135,53 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Persistent Schema Warning */}
-      {lastErrorMessage?.includes('ALERT') && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-4">
-           <Database className="w-6 h-6 text-amber-600 flex-shrink-0" />
+      {/* Schema Mismatch Fix Alert */}
+      {(lastErrorMessage || "").includes('has_insurance') || (lastErrorMessage || "").includes('404') || lastErrorMessage?.includes('column') ? (
+        <div className="bg-red-50 border-2 border-red-200 p-6 rounded-3xl flex flex-col md:flex-row items-start gap-6 animate-in slide-in-from-top-4 shadow-xl shadow-red-100/50">
+           <div className="bg-red-100 p-3 rounded-2xl">
+             <Database className="w-8 h-8 text-red-600 flex-shrink-0" />
+           </div>
            <div className="flex-1">
-             <h4 className="text-sm font-bold text-amber-800">Database Setup Required</h4>
-             <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-               Run the following command in your <b>Supabase SQL Editor</b> to enable status tracking and assessments:
+             <div className="flex items-center gap-2 mb-1">
+               <h4 className="text-lg font-bold text-red-900">Database Repair Required</h4>
+               <span className="text-[10px] bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-black uppercase">Critical Fix</span>
+             </div>
+             <p className="text-xs text-red-700 mt-1 leading-relaxed font-medium">
+               The "has_insurance" column is missing. Copy the SQL below and run it in your <b>Supabase SQL Editor</b> to fix the database:
              </p>
-             <code className="block mt-2 p-3 bg-amber-100 rounded text-[10px] font-mono font-bold text-amber-900 border border-amber-200 whitespace-pre-wrap">
-{`ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS entry_date DATE;
-ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS source_doctor_name TEXT;
-ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS doctor_assessment JSONB;
-ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
-             </code>
+             <div className="relative mt-4 group">
+               <code className="block p-4 bg-slate-900 rounded-2xl text-[11px] font-mono font-bold text-emerald-400 border border-slate-800 whitespace-pre-wrap shadow-inner overflow-x-auto">
+{`ALTER TABLE himas_data 
+ADD COLUMN IF NOT EXISTS name TEXT,
+ADD COLUMN IF NOT EXISTS dob DATE,
+ADD COLUMN IF NOT EXISTS entry_date DATE,
+ADD COLUMN IF NOT EXISTS gender TEXT,
+ADD COLUMN IF NOT EXISTS age INTEGER,
+ADD COLUMN IF NOT EXISTS mobile TEXT,
+ADD COLUMN IF NOT EXISTS occupation TEXT,
+ADD COLUMN IF NOT EXISTS has_insurance TEXT,
+ADD COLUMN IF NOT EXISTS insurance_name TEXT,
+ADD COLUMN IF NOT EXISTS source TEXT,
+ADD COLUMN IF NOT EXISTS source_doctor_name TEXT,
+ADD COLUMN IF NOT EXISTS condition TEXT,
+ADD COLUMN IF NOT EXISTS doctor_assessment JSONB,
+ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
+               </code>
+               <button 
+                 onClick={() => {
+                   const code = `ALTER TABLE himas_data \nADD COLUMN IF NOT EXISTS name TEXT,\nADD COLUMN IF NOT EXISTS dob DATE,\nADD COLUMN IF NOT EXISTS entry_date DATE,\nADD COLUMN IF NOT EXISTS gender TEXT,\nADD COLUMN IF NOT EXISTS age INTEGER,\nADD COLUMN IF NOT EXISTS mobile TEXT,\nADD COLUMN IF NOT EXISTS occupation TEXT,\nADD COLUMN IF NOT EXISTS has_insurance TEXT,\nADD COLUMN IF NOT EXISTS insurance_name TEXT,\nADD COLUMN IF NOT EXISTS source TEXT,\nADD COLUMN IF NOT EXISTS source_doctor_name TEXT,\nADD COLUMN IF NOT EXISTS condition TEXT,\nADD COLUMN IF NOT EXISTS doctor_assessment JSONB,\nADD COLUMN IF NOT EXISTS package_proposal JSONB;`;
+                   navigator.clipboard.writeText(code);
+                   alert("Full Schema SQL Copied!");
+                 }}
+                 className="absolute top-3 right-3 bg-slate-800 hover:bg-hospital-600 text-white p-2 rounded-xl text-[10px] font-bold transition-all"
+               >
+                 Copy All SQL
+               </button>
+             </div>
+             <p className="text-[10px] text-red-500 mt-3 font-bold italic">* Important: Refresh the browser after running the SQL in Supabase.</p>
            </div>
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
         <div className="relative w-full md:w-96">

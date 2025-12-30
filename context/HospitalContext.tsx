@@ -67,24 +67,34 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   // EXPLICIT MAPPING: DB (snake_case) -> APP (camelCase)
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
+    
+    // Ensure JSON fields are handled if they come back as strings (though usually objects in supabase-js)
+    const doctorAssessment = typeof item.doctor_assessment === 'string' 
+      ? JSON.parse(item.doctor_assessment) 
+      : item.doctor_assessment;
+      
+    const packageProposal = typeof item.package_proposal === 'string' 
+      ? JSON.parse(item.package_proposal) 
+      : item.package_proposal;
+
     return {
       id: item.id,
       hospital_id: item.hospital_id,
       name: item.name,
-      dob: item.dob,
-      entry_date: item.entry_date,
-      gender: item.gender,
+      dob: item.dob || null,
+      entry_date: item.entry_date || null,
+      gender: item.gender || 'Other',
       age: Number(item.age) || 0,
-      mobile: item.mobile,
-      occupation: item.occupation,
-      hasInsurance: item.has_insurance,
-      insuranceName: item.insurance_name,
-      source: item.source,
-      sourceDoctorName: item.source_doctor_name,
-      condition: item.condition,
+      mobile: item.mobile || '',
+      occupation: item.occupation || '',
+      hasInsurance: item.has_insurance || 'No',
+      insuranceName: item.insurance_name || '',
+      source: item.source || 'Other',
+      sourceDoctorName: item.source_doctor_name || '',
+      condition: item.condition || 'Other',
       created_at: item.created_at,
-      doctorAssessment: item.doctor_assessment || null,
-      packageProposal: item.package_proposal || null
+      doctorAssessment: doctorAssessment || null,
+      packageProposal: packageProposal || null
     };
   };
 
@@ -113,18 +123,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
-      // Re-fetch session directly from Supabase to ensure freshness
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session?.user) {
-        console.warn("No active Supabase session found.");
-        return null;
-      }
+      if (sessionError || !session?.user) return null;
       
       const email = session.user.email || '';
       const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
       
-      // Map demo accounts to a shared facility, others to their own UID
       const id = demoEmails.includes(email.toLowerCase()) 
         ? SHARED_FACILITY_ID 
         : (session.user.user_metadata?.hospital_id || session.user.id);
@@ -132,7 +137,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       cachedHospitalId.current = id;
       return id;
     } catch (e) {
-      console.error("Auth helper error:", e);
       return null;
     }
   };
@@ -144,10 +148,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) {
-        if (!isBackground) {
-          setIsLoading(false);
-          setSaveStatus('saved');
-        }
+        if (!isBackground) setIsLoading(false);
+        setSaveStatus('saved');
         return;
       }
 
@@ -156,22 +158,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         .select('*')
         .eq('hospital_id', hospitalId);
 
-      if (error) {
-        throw new Error(error.message || "Database request failed.");
-      }
+      if (error) throw error;
       
       const mapped = (data || [])
         .map(mapPatientFromDB)
         .filter((p): p is Patient => p !== null)
-        .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+        .sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
 
       setPatients(mapped);
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (e: any) {
-      const msg = e.message || "Network Error: Could not connect to Supabase.";
       console.error("Data Loading Error:", e);
-      setLastErrorMessage(msg);
+      setLastErrorMessage(e.message);
       setSaveStatus('error');
     } finally {
       if (!isBackground) setIsLoading(false);
@@ -200,23 +199,21 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         .select()
         .single();
 
-      if (error) {
-        throw new Error(error.message || "Failed to update record in database.");
-      }
+      if (error) throw error;
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
+        // Critical: Sync to sheets after state is updated locally
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       
       setSaveStatus('saved');
     } catch (err: any) {
-      const msg = err.message || "An unexpected error occurred during update.";
       console.error("Detailed Update Error:", err);
-      setLastErrorMessage(msg);
+      setLastErrorMessage(err.message);
       setSaveStatus('error');
-      throw err; // Re-throw so UI can handle local state
+      throw err;
     }
   };
 
@@ -228,14 +225,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         clearError();
         try {
           const hospitalId = await getEffectiveHospitalId();
-          if (!hospitalId) throw new Error("Not logged in. Please sign in again.");
+          if (!hospitalId) throw new Error("Not logged in.");
 
           const dbPayload = mapPatientToDB({ ...pd, hospital_id: hospitalId });
           const { data, error } = await supabase.from('himas_data').insert(dbPayload).select().single();
           
-          if (error) {
-            throw new Error(error.message || "Insertion failed.");
-          }
+          if (error) throw error;
           
           const mapped = mapPatientFromDB(data);
           if (mapped) {
@@ -244,9 +239,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
           setSaveStatus('saved');
         } catch (err: any) {
-          const msg = err.message || "Could not register patient.";
-          console.error("Detailed Add Error:", err);
-          setLastErrorMessage(msg);
+          setLastErrorMessage(err.message);
           setSaveStatus('error');
           throw err;
         }
@@ -263,17 +256,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       },
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
-        if (p) {
-          const updated = { ...p, doctorAssessment: ass };
-          await updatePatient(updated);
-        }
+        if (p) await updatePatient({ ...p, doctorAssessment: ass });
       }, 
       updatePackageProposal: async (pid, prop) => {
         const p = patients.find(p => p.id === pid);
-        if (p) {
-          const updated = { ...p, packageProposal: prop };
-          await updatePatient(updated);
-        }
+        if (p) await updatePatient({ ...p, packageProposal: prop });
       },
       getPatientById: (id) => patients.find(p => p.id === id),
       staffUsers, registerStaff: async () => {},
