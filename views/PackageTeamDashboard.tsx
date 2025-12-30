@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
-import { Briefcase, Calendar, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock, Filter, Search, ArrowRight, XCircle, Trophy, History, X, Download, FileSpreadsheet, ChevronRight } from 'lucide-react';
+import { Briefcase, Calendar, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Clock, Filter, Search, ArrowRight, XCircle, Trophy, History, X, Download, FileSpreadsheet, ChevronRight, Stethoscope } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
@@ -40,6 +40,15 @@ export const PackageTeamDashboard: React.FC = () => {
 
   // --- Logic ---
   const today = new Date().toISOString().split('T')[0];
+
+  const getProcedureDisplay = (p: Patient) => {
+    const assessment = p.doctorAssessment;
+    if (!assessment) return 'N/A';
+    if (assessment.surgeryProcedure === SurgeryProcedure.Others) {
+      return assessment.otherSurgeryName || 'Custom Surgery';
+    }
+    return assessment.surgeryProcedure || 'N/A';
+  };
 
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
@@ -87,7 +96,7 @@ export const PackageTeamDashboard: React.FC = () => {
     const rows = filteredPatients.map(p => [
       p.id, p.name, p.condition, p.entry_date, p.age, p.mobile,
       p.packageProposal?.status || 'Pending',
-      p.doctorAssessment?.surgeryProcedure || 'N/A',
+      getProcedureDisplay(p),
       p.packageProposal?.outcomeDate || 'N/A'
     ].map(cell => `"${cell}"`).join(','));
     const csvContent = [headers.join(','), ...rows].join('\n');
@@ -212,10 +221,16 @@ export const PackageTeamDashboard: React.FC = () => {
                       <div className="font-bold text-slate-800 truncate">{p.name}</div>
                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter ${p.packageProposal?.status === ProposalStatus.SurgeryFixed ? 'bg-emerald-100 text-emerald-600' : p.packageProposal?.status === ProposalStatus.SurgeryLost ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>{p.packageProposal?.status || 'New'}</span>
                     </div>
-                    <div className="text-[10px] font-bold text-slate-400 flex flex-wrap gap-2">
-                      <span className="text-hospital-600 uppercase">{p.condition}</span>
-                      <span>•</span>
-                      <span>DOP: {p.entry_date}</span>
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-bold text-slate-400 flex flex-wrap gap-2">
+                        <span className="text-hospital-600 uppercase">{p.condition}</span>
+                        <span>•</span>
+                        <span>DOP: {p.entry_date}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 bg-white/50 px-2 py-1 rounded-lg border border-slate-100 shadow-sm w-fit">
+                        <Stethoscope className="w-3 h-3 text-hospital-400" />
+                        <span className="truncate max-w-[150px]">{getProcedureDisplay(p)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -232,10 +247,19 @@ export const PackageTeamDashboard: React.FC = () => {
                         <div className="bg-white p-2.5 rounded-2xl shadow-sm border border-slate-100"><User className="w-5 h-5 text-hospital-600" /></div>
                         <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedPatient.name}</h3>
                       </div>
-                      <div className="flex gap-4 text-xs font-bold text-slate-500">
-                        <span>{selectedPatient.age} Yrs • {selectedPatient.gender}</span>
-                        <span>•</span>
-                        <span className="text-hospital-600 uppercase">{selectedPatient.condition}</span>
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Condition</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedPatient.condition}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Recommended Procedure</span>
+                          <span className="text-xs font-bold text-hospital-600">{getProcedureDisplay(selectedPatient)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</span>
+                          <span className="text-xs font-mono font-bold text-slate-700">{selectedPatient.mobile}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">

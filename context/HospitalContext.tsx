@@ -56,6 +56,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     } else {
       sessionStorage.removeItem(STORAGE_KEY_ROLE);
       cachedHospitalId.current = null;
+      setPatients([]);
     }
     _setCurrentUserRole(role);
   };
@@ -112,18 +113,26 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getEffectiveHospitalId = async () => {
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
+      // Re-fetch session directly from Supabase to ensure freshness
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.user) {
+        console.warn("No active Supabase session found.");
+        return null;
+      }
       
       const email = session.user.email || '';
       const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
-      const id = demoEmails.includes(email) 
+      
+      // Map demo accounts to a shared facility, others to their own UID
+      const id = demoEmails.includes(email.toLowerCase()) 
         ? SHARED_FACILITY_ID 
         : (session.user.user_metadata?.hospital_id || session.user.id);
       
       cachedHospitalId.current = id;
       return id;
     } catch (e) {
+      console.error("Auth helper error:", e);
       return null;
     }
   };
@@ -135,7 +144,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) {
-        if (!isBackground) setIsLoading(false);
+        if (!isBackground) {
+          setIsLoading(false);
+          setSaveStatus('saved');
+        }
         return;
       }
 
@@ -144,7 +156,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         .select('*')
         .eq('hospital_id', hospitalId);
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || "Database request failed.");
+      }
       
       const mapped = (data || [])
         .map(mapPatientFromDB)
@@ -155,8 +169,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (e: any) {
+      const msg = e.message || "Network Error: Could not connect to Supabase.";
       console.error("Data Loading Error:", e);
-      setLastErrorMessage(e.message || "Fetch failed.");
+      setLastErrorMessage(msg);
       setSaveStatus('error');
     } finally {
       if (!isBackground) setIsLoading(false);
@@ -166,7 +181,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (currentUserRole) {
       loadData();
-      pollingInterval.current = window.setInterval(() => loadData(true), 15000);
+      pollingInterval.current = window.setInterval(() => loadData(true), 20000);
     } else {
       setIsLoading(false);
     }
@@ -175,6 +190,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
+    clearError();
     try {
       const dbPayload = mapPatientToDB(updatedPatient);
       const { data, error } = await supabase
@@ -184,18 +200,23 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || "Failed to update record in database.");
+      }
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
-        syncToGoogleSheets(mapped).catch(e => console.error("Async Sync Error:", e));
+        syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       
       setSaveStatus('saved');
     } catch (err: any) {
-      console.error("Update Error:", err);
+      const msg = err.message || "An unexpected error occurred during update.";
+      console.error("Detailed Update Error:", err);
+      setLastErrorMessage(msg);
       setSaveStatus('error');
+      throw err; // Re-throw so UI can handle local state
     }
   };
 
@@ -204,30 +225,40 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       currentUserRole, setCurrentUserRole, patients, updatePatient,
       addPatient: async (pd) => {
         setSaveStatus('saving');
+        clearError();
         try {
           const hospitalId = await getEffectiveHospitalId();
+          if (!hospitalId) throw new Error("Not logged in. Please sign in again.");
+
           const dbPayload = mapPatientToDB({ ...pd, hospital_id: hospitalId });
           const { data, error } = await supabase.from('himas_data').insert(dbPayload).select().single();
-          if (error) throw error;
+          
+          if (error) {
+            throw new Error(error.message || "Insertion failed.");
+          }
           
           const mapped = mapPatientFromDB(data);
           if (mapped) {
             setPatients(prev => [mapped, ...prev]);
-            syncToGoogleSheets(mapped).catch(e => console.error("Async Sync Error:", e));
+            syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
           }
           setSaveStatus('saved');
-        } catch (err) {
-          console.error("Add Patient Error:", err);
+        } catch (err: any) {
+          const msg = err.message || "Could not register patient.";
+          console.error("Detailed Add Error:", err);
+          setLastErrorMessage(msg);
           setSaveStatus('error');
+          throw err;
         }
       },
       deletePatient: async (id) => {
         try {
           const hospitalId = await getEffectiveHospitalId();
-          await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+          const { error } = await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
+          if (error) throw error;
           setPatients(prev => prev.filter(p => p.id !== id));
-        } catch (err) {
-          console.error("Delete Error:", err);
+        } catch (err: any) {
+          console.error("Delete Error:", err.message);
         }
       },
       updateDoctorAssessment: async (pid, ass) => {
@@ -257,6 +288,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 export const useHospital = () => {
   const context = useContext(HospitalContext);
-  if (!context) throw new Error('useHospital missing');
+  if (!context) throw new Error('useHospital must be used within a HospitalProvider');
   return context;
 };
