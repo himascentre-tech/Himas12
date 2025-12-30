@@ -7,7 +7,7 @@ import {
   PlusCircle, Search, CheckCircle, Clock, 
   Pencil, Trash2, User, Loader2, Calendar, 
   Phone, ChevronRight, AlertCircle, X,
-  Database
+  Database, Stethoscope
 } from 'lucide-react';
 
 export const FrontOfficeDashboard: React.FC = () => {
@@ -33,6 +33,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     hasInsurance: 'No',
     insuranceName: '',
     source: 'Google',
+    sourceDoctorName: '',
     condition: Condition.Piles 
   });
 
@@ -97,7 +98,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const resetForm = () => {
     setFormData({
       id: '', name: '', dob: '', entry_date: getTodayDate(), gender: Gender.Male, age: 0, mobile: '', occupation: '',
-      hasInsurance: 'No', insuranceName: '', source: 'Google', condition: Condition.Piles
+      hasInsurance: 'No', insuranceName: '', source: 'Google', sourceDoctorName: '', condition: Condition.Piles
     });
     setEditingId(null);
     setStep(1);
@@ -145,6 +146,7 @@ export const FrontOfficeDashboard: React.FC = () => {
              </p>
              <code className="block mt-2 p-3 bg-amber-100 rounded text-[10px] font-mono font-bold text-amber-900 border border-amber-200 whitespace-pre-wrap">
 {`ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS entry_date DATE;
+ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS source_doctor_name TEXT;
 ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS doctor_assessment JSONB;
 ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
              </code>
@@ -193,7 +195,6 @@ ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
             <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-8 space-y-8">
               {step === 1 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in slide-in-from-left-4 duration-300">
-                  {/* ... Same form fields ... */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-hospital-600 text-white flex items-center justify-center text-[10px] font-bold">1</div>
@@ -290,12 +291,22 @@ ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
                       <div className="grid grid-cols-2 gap-2">
                         {sources.map(s => (
                           <label key={s} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
-                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => setFormData({...formData, source: s})} />
+                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => setFormData({...formData, source: s, sourceDoctorName: s === 'Doctor Recommended' ? formData.sourceDoctorName : ''})} />
                             <span className="text-[10px] truncate">{s}</span>
                           </label>
                         ))}
                       </div>
                     </div>
+
+                    {formData.source === 'Doctor Recommended' && (
+                      <div className="animate-in slide-in-from-top-2 duration-300">
+                        <label className="flex items-center gap-1.5 block text-[10px] font-bold text-hospital-600 uppercase tracking-widest mb-1.5">
+                          <Stethoscope className="w-3 h-3" />
+                          Referring Doctor Name *
+                        </label>
+                        <input required type="text" placeholder="Dr. Sharma" className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-hospital-700" value={formData.sourceDoctorName} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} />
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -324,6 +335,13 @@ ALTER TABLE himas_data ADD COLUMN IF NOT EXISTS package_proposal JSONB;`}
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">DOP (Entry Date)</label>
                       <div className="text-xl font-bold text-slate-900">{formData.entry_date ? new Date(formData.entry_date).toLocaleDateString('en-IN', { dateStyle: 'long' }) : 'N/A'}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Source</label>
+                      <div className="text-xl font-bold text-slate-900">
+                        {formData.source} 
+                        {formData.sourceDoctorName && <span className="text-hospital-600 ml-2">({formData.sourceDoctorName})</span>}
+                      </div>
                     </div>
                   </div>
 

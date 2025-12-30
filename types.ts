@@ -23,6 +23,20 @@ export enum SurgeonCode {
   S1 = 'S1 - Surgery Recommended',
 }
 
+export enum SurgeryProcedure {
+  LapChole = 'Lap Cholecystectomy',
+  LapAppen = 'Lap Appendectomy',
+  LapUmbilical = 'Lap Umbilical Hernioplasty',
+  LapInguinal = 'Lap Inguinal Hernioplasty',
+  LaserVaricose = 'Laser Varicose Veins',
+  LaserPiles = 'Laser Piles',
+  LaserPilonido = 'Laser Pilonidoplasty',
+  LaserFistula = 'Laser Fistula + Perianal Abscess',
+  LaserFissure = 'Laser Fissure',
+  StaplerHaem = 'Stapler Haemorrhoidectomy',
+  Others = 'Others',
+}
+
 export enum PainSeverity {
   Low = 'Low',
   Moderate = 'Moderate',
@@ -42,8 +56,17 @@ export enum ConversionReadiness {
   CR4 = 'CR4 - Not Ready',
 }
 
+export enum ProposalStatus {
+  Pending = 'Pending Counseling',
+  FollowUp = 'Follow Up Scheduled',
+  SurgeryFixed = 'Surgery Fixed',
+  SurgeryLost = 'Surgery Lost',
+}
+
 export interface DoctorAssessment {
   quickCode: SurgeonCode;
+  surgeryProcedure?: SurgeryProcedure;
+  otherSurgeryName?: string;
   painSeverity: PainSeverity;
   affordability: Affordability;
   conversionReadiness: ConversionReadiness;
@@ -57,7 +80,10 @@ export interface PackageProposal {
   objectionIdentified: string;
   counselingStrategy: string;
   followUpDate: string; // YYYY-MM-DD
+  status: ProposalStatus;
   proposalCreatedAt: string;
+  lastFollowUpAt?: string;
+  outcomeDate?: string; // Date when surgery was fixed or lost (YYYY-MM-DD)
 }
 
 export interface Patient {
@@ -73,6 +99,7 @@ export interface Patient {
   hasInsurance: 'Yes' | 'No' | 'Not Sure';
   insuranceName?: string; 
   source: string; 
+  sourceDoctorName?: string;
   condition: Condition;
   created_at: string; 
   doctorAssessment?: DoctorAssessment;

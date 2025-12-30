@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Clock, Database, AlertCircle, Loader2, Info, ShieldCheck } from 'lucide-react';
+import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Clock, Database, AlertCircle, Loader2, Info, ShieldCheck, ClipboardList, Edit3 } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
@@ -11,6 +11,8 @@ export const DoctorDashboard: React.FC = () => {
 
   const [assessment, setAssessment] = useState<Partial<DoctorAssessment>>({
     quickCode: SurgeonCode.S1,
+    surgeryProcedure: SurgeryProcedure.LapChole,
+    otherSurgeryName: '',
     painSeverity: PainSeverity.Moderate,
     affordability: Affordability.A2,
     conversionReadiness: ConversionReadiness.CR2,
@@ -25,6 +27,8 @@ export const DoctorDashboard: React.FC = () => {
       } else {
         setAssessment({
           quickCode: SurgeonCode.S1,
+          surgeryProcedure: SurgeryProcedure.LapChole,
+          otherSurgeryName: '',
           painSeverity: PainSeverity.Moderate,
           affordability: Affordability.A2,
           conversionReadiness: ConversionReadiness.CR2,
@@ -36,19 +40,26 @@ export const DoctorDashboard: React.FC = () => {
   }, [selectedPatient]);
 
   const isMedicationOnly = assessment.quickCode === SurgeonCode.M1;
+  const isOtherProcedure = assessment.surgeryProcedure === SurgeryProcedure.Others;
 
   const handleQuickCodeChange = (code: SurgeonCode) => {
     if (code === SurgeonCode.M1) {
       setAssessment({
         ...assessment,
         quickCode: code,
+        surgeryProcedure: undefined,
+        otherSurgeryName: '',
         painSeverity: PainSeverity.Low,
         affordability: Affordability.A1,
         conversionReadiness: ConversionReadiness.CR4,
         tentativeSurgeryDate: ''
       });
     } else {
-      setAssessment({ ...assessment, quickCode: code });
+      setAssessment({ 
+        ...assessment, 
+        quickCode: code,
+        surgeryProcedure: assessment.surgeryProcedure || SurgeryProcedure.LapChole
+      });
     }
   };
 
@@ -137,7 +148,7 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Patient Context Summary Bar - HIGHLY VISIBLE */}
+            {/* Patient Context Summary Bar */}
             <div className="px-6 py-5 bg-white border-b grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
                 <div className="bg-blue-500 p-2 rounded-lg text-white">
@@ -186,7 +197,6 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Persistent Database Warning */}
             {lastErrorMessage?.includes('DATABASE ALERT') && (
               <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 text-amber-800 text-xs animate-in slide-in-from-top-2">
                  <Database className="w-4 h-4 animate-pulse" />
@@ -198,7 +208,6 @@ export const DoctorDashboard: React.FC = () => {
               <section className="space-y-6">
                 <div className="flex items-center gap-2 border-l-4 border-hospital-500 pl-4 py-1">
                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Treatment Code</h3>
-                   <span className="text-[10px] text-slate-400 italic">(Select primary recommendation)</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.values(SurgeonCode).map(code => (
@@ -225,6 +234,43 @@ export const DoctorDashboard: React.FC = () => {
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Surgical Assessment</h3>
                   </div>
                   
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                          <ClipboardList className="w-3.5 h-3.5 text-hospital-500" />
+                          Planned Surgery Procedure *
+                        </label>
+                        <select 
+                          required
+                          className="w-full border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none bg-slate-50/50" 
+                          value={assessment.surgeryProcedure || ''} 
+                          onChange={e => setAssessment({...assessment, surgeryProcedure: e.target.value as SurgeryProcedure, otherSurgeryName: e.target.value === SurgeryProcedure.Others ? assessment.otherSurgeryName : ''})}
+                        >
+                          <option value="" disabled>Select Procedure...</option>
+                          {Object.values(SurgeryProcedure).map(sp => <option key={sp} value={sp}>{sp}</option>)}
+                        </select>
+                      </div>
+
+                      {isOtherProcedure && (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                          <label className="flex items-center gap-2 text-[10px] font-bold text-hospital-600 uppercase tracking-widest mb-2">
+                            <Edit3 className="w-3.5 h-3.5" />
+                            Specify Other Surgery Name *
+                          </label>
+                          <input 
+                            required
+                            type="text"
+                            placeholder="Type the surgery name here..."
+                            className="w-full border-2 border-hospital-100 rounded-xl p-4 text-base font-bold text-slate-800 focus:ring-2 focus:ring-hospital-500 outline-none transition-all bg-hospital-50/30"
+                            value={assessment.otherSurgeryName || ''}
+                            onChange={e => setAssessment({...assessment, otherSurgeryName: e.target.value})}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pain Severity Profile</label>
                     <div className="grid grid-cols-3 gap-3">
