@@ -63,24 +63,49 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearError = () => setLastErrorMessage(null);
   const forceStopLoading = () => setIsLoading(false);
 
+  // EXPLICIT MAPPING: DB (snake_case) -> APP (camelCase)
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
     return {
-      ...item,
-      doctorAssessment: item.doctor_assessment || item.doctorAssessment || null,
-      packageProposal: item.package_proposal || item.packageProposal || null,
-      entry_date: item.entry_date || (item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
-      age: Number(item.age) || 0 
+      id: item.id,
+      hospital_id: item.hospital_id,
+      name: item.name,
+      dob: item.dob,
+      entry_date: item.entry_date,
+      gender: item.gender,
+      age: Number(item.age) || 0,
+      mobile: item.mobile,
+      occupation: item.occupation,
+      hasInsurance: item.has_insurance,
+      insuranceName: item.insurance_name,
+      source: item.source,
+      sourceDoctorName: item.source_doctor_name,
+      condition: item.condition,
+      created_at: item.created_at,
+      doctorAssessment: item.doctor_assessment || null,
+      packageProposal: item.package_proposal || null
     };
   };
 
-  const mapPatientToDB = (patient: any) => {
-    const { doctorAssessment, packageProposal, ...rest } = patient;
+  // EXPLICIT MAPPING: APP (camelCase) -> DB (snake_case)
+  const mapPatientToDB = (p: any) => {
     return {
-      ...rest,
-      doctor_assessment: doctorAssessment || null,
-      package_proposal: packageProposal || null,
-      age: Number(rest.age) || 0
+      id: p.id,
+      hospital_id: p.hospital_id,
+      name: p.name,
+      dob: p.dob || null,
+      entry_date: p.entry_date,
+      gender: p.gender,
+      age: Number(p.age) || 0,
+      mobile: p.mobile,
+      occupation: p.occupation || null,
+      has_insurance: p.hasInsurance,
+      insurance_name: p.insuranceName || null,
+      source: p.source,
+      source_doctor_name: p.sourceDoctorName || null,
+      condition: p.condition,
+      doctor_assessment: p.doctorAssessment || null,
+      package_proposal: p.packageProposal || null
     };
   };
 
@@ -101,23 +126,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (e) {
       return null;
     }
-  };
-
-  const performSafeUpsert = async (payload: any, isUpdate = false) => {
-    const dbPayload = mapPatientToDB(payload);
-    const query = isUpdate 
-      ? supabase.from('himas_data').update(dbPayload).eq('id', dbPayload.id)
-      : supabase.from('himas_data').insert(dbPayload);
-
-    const result = await query.select().single();
-
-    if (result.error) {
-      console.error("Supabase Operation Error:", result.error);
-      if (result.error.code === '42703' || result.error.message.includes('column')) {
-        setLastErrorMessage(`DATABASE ALERT: Columns missing. Check Supabase SQL Editor.`);
-      }
-    }
-    return result;
   };
 
   const loadData = useCallback(async (isBackground = false) => {
@@ -168,8 +176,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
     try {
-      const hospitalId = await getEffectiveHospitalId();
-      const { data, error } = await performSafeUpsert({...updatedPatient, hospital_id: hospitalId}, true);
+      const dbPayload = mapPatientToDB(updatedPatient);
+      const { data, error } = await supabase
+        .from('himas_data')
+        .update(dbPayload)
+        .eq('id', dbPayload.id)
+        .select()
+        .single();
+
       if (error) throw error;
       
       const mapped = mapPatientFromDB(data);
@@ -192,7 +206,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         setSaveStatus('saving');
         try {
           const hospitalId = await getEffectiveHospitalId();
-          const { data, error } = await performSafeUpsert({ ...pd, hospital_id: hospitalId });
+          const dbPayload = mapPatientToDB({ ...pd, hospital_id: hospitalId });
+          const { data, error } = await supabase.from('himas_data').insert(dbPayload).select().single();
           if (error) throw error;
           
           const mapped = mapPatientFromDB(data);
