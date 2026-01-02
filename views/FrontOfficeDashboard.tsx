@@ -8,7 +8,8 @@ import {
   Pencil, User, Loader2, Calendar, 
   Phone, ChevronRight, AlertCircle, X,
   Stethoscope, Users, History, Timer, ArrowRight,
-  Filter, ChevronLeft, ChevronRight as ChevronRightIcon
+  Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
+  Globe
 } from 'lucide-react';
 
 type TabType = 'NEW' | 'HISTORY' | 'OLD';
@@ -283,6 +284,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <th className="px-6 py-4">File ID</th>
                   <th className="px-6 py-4">Patient Profile</th>
                   <th className="px-6 py-4">Condition</th>
+                  <th className="px-6 py-4">Lead Source</th>
                   <th className="px-6 py-4 text-center">Visit Classification</th>
                 </tr>
               </thead>
@@ -305,6 +307,12 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <td className="px-6 py-4">
                       <span className="text-[10px] font-bold text-hospital-600 uppercase tracking-tighter bg-hospital-50 px-2 py-1 rounded-md">{entry.patient.condition}</span>
                     </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                        <Globe className="w-3 h-3 text-slate-300" />
+                        {entry.patient.source}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${entry.type === 'NEW' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                         {entry.type === 'NEW' ? <PlusCircle className="w-3 h-3" /> : <History className="w-3 h-3" />}
@@ -315,7 +323,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 ))}
                 {historyOPDList.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-24 text-center">
+                    <td colSpan={6} className="p-24 text-center">
                       <div className="bg-slate-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6 border border-slate-100">
                         <Users className="w-10 h-10 text-slate-200" />
                       </div>
