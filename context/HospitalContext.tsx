@@ -85,6 +85,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       ? JSON.parse(item.package_proposal) 
       : item.package_proposal;
 
+    // Merge top-level notes into the assessment if present in DB
+    if (item.notes && doctorAssessment) {
+      doctorAssessment.notes = item.notes;
+    }
+
     return {
       id: item.id,
       hospital_id: item.hospital_id,
@@ -127,7 +132,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       doctor_assessment: p.doctorAssessment || null,
       package_proposal: p.packageProposal || null,
       is_follow_up: p.isFollowUpVisit || false,
-      last_follow_up_visit_date: p.lastFollowUpVisitDate || null
+      last_follow_up_visit_date: p.lastFollowUpVisitDate || null,
+      notes: p.doctorAssessment?.notes || null // Save notes to top-level column
     };
   };
 

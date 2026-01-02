@@ -42,7 +42,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
 
     const headers = [
       'File Registration No', 'Name', 'Entry Date (DOP)', 'Gender', 'Age', 'Phone Number', 
-      'Condition', 'Surgeon Code', 'Surgery Procedure', 'Proposal Status', 
+      'Condition', 'Surgeon Code', 'Surgery Procedure', 'Clinical Notes', 'Proposal Status', 
       'Follow Up Visit Date', 'Next Follow Up Date', 'Outcome Date', 'Surgery Fixed Date', 'Surgery Lost Date'
     ];
 
@@ -54,10 +54,11 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
 
       const status = p.packageProposal?.status;
       const outcomeDate = p.packageProposal?.outcomeDate || '';
+      const clinicalNotes = p.doctorAssessment?.notes || '';
 
       return [
         p.id, p.name, p.entry_date || '', p.gender, p.age, p.mobile, p.condition,
-        p.doctorAssessment?.quickCode || '', proc, status || 'New',
+        p.doctorAssessment?.quickCode || '', proc, clinicalNotes, status || 'New',
         p.lastFollowUpVisitDate || '', p.packageProposal?.followUpDate || '', outcomeDate,
         status === ProposalStatus.SurgeryFixed ? outcomeDate : '',
         status === ProposalStatus.SurgeryLost ? outcomeDate : ''

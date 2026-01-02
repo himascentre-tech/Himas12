@@ -40,6 +40,7 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       readiness: patient.doctorAssessment?.conversionReadiness || "N/A",
       tentative_date: patient.doctorAssessment?.tentativeSurgeryDate || "N/A",
       doctor_signature: patient.doctorAssessment?.doctorSignature || "N/A",
+      clinical_notes: patient.doctorAssessment?.notes || "N/A",
       
       // Counseling & Conversion
       status: currentStatus, 

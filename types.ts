@@ -72,6 +72,7 @@ export interface DoctorAssessment {
   conversionReadiness: ConversionReadiness;
   tentativeSurgeryDate: string; // YYYY-MM-DD
   doctorSignature: string;
+  notes?: string;
   assessedAt: string;
 }
 

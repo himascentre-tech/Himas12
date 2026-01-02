@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
-import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History } from 'lucide-react';
+import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
@@ -17,13 +17,17 @@ export const DoctorDashboard: React.FC = () => {
     affordability: Affordability.A2,
     conversionReadiness: ConversionReadiness.CR2,
     tentativeSurgeryDate: '',
-    doctorSignature: ''
+    doctorSignature: '',
+    notes: ''
   });
 
   useEffect(() => {
     if (selectedPatient) {
       if (selectedPatient.doctorAssessment) {
-        setAssessment(selectedPatient.doctorAssessment);
+        setAssessment({
+          ...selectedPatient.doctorAssessment,
+          notes: selectedPatient.doctorAssessment.notes || ''
+        });
       } else {
         setAssessment({
           quickCode: SurgeonCode.S1,
@@ -33,7 +37,8 @@ export const DoctorDashboard: React.FC = () => {
           affordability: Affordability.A2,
           conversionReadiness: ConversionReadiness.CR2,
           tentativeSurgeryDate: '',
-          doctorSignature: ''
+          doctorSignature: '',
+          notes: ''
         });
       }
     }
@@ -254,6 +259,24 @@ export const DoctorDashboard: React.FC = () => {
                   </div>
                 </section>
               )}
+
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 border-l-4 border-hospital-500 pl-4 py-1">
+                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Clinical Findings & Notes</h3>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-hospital-500" />
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Physical Examination / Remarks</label>
+                  </div>
+                  <textarea 
+                    className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 outline-none focus:ring-4 focus:ring-hospital-50 transition-all min-h-[120px]" 
+                    placeholder="Enter detailed clinical findings, medical history, or specific instructions..."
+                    value={assessment.notes || ''}
+                    onChange={e => setAssessment({...assessment, notes: e.target.value})}
+                  />
+                </div>
+              </section>
 
               <section className="pt-8 border-t border-slate-100">
                 <div className="bg-slate-50 p-8 rounded-3xl border-2 border-slate-200 border-dashed relative">
