@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -9,7 +8,7 @@ import {
   Phone, ChevronRight, AlertCircle, X,
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
-  Globe
+  Globe, UserPlus, ShieldCheck
 } from 'lucide-react';
 
 type TabType = 'NEW' | 'HISTORY' | 'OLD';
@@ -23,6 +22,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+  const [otherSourceDetail, setOtherSourceDetail] = useState('');
   
   // History Filter State
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(new Date().toISOString().split('T')[0]);
@@ -102,6 +102,23 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please fill in Name, Mobile, and Age.");
       return;
     }
+
+    // Insurance validation
+    if (formData.hasInsurance === 'Yes' && !formData.insuranceName?.trim()) {
+      setLocalError("Please specify the Insurance Provider Name.");
+      return;
+    }
+
+    // Source specific validation
+    if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName?.trim()) {
+      setLocalError("Referral Doctor Name is required for Doctor Recommended source.");
+      return;
+    }
+    if (formData.source === 'Other' && !otherSourceDetail.trim()) {
+      setLocalError("Please specify the source details.");
+      return;
+    }
+
     setStep(2);
   };
 
@@ -123,13 +140,16 @@ export const FrontOfficeDashboard: React.FC = () => {
     setIsSubmitting(true);
     
     try {
+      const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
+      const submissionData = { ...formData, source: finalSource };
+
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          await updatePatient({ ...original, ...formData as Patient });
+          await updatePatient({ ...original, ...submissionData as Patient });
         }
       } else {
-        await addPatient({ ...formData, id: formData.id?.trim().toUpperCase() } as any);
+        await addPatient({ ...submissionData, id: formData.id?.trim().toUpperCase() } as any);
       }
       
       setShowForm(false);
@@ -167,13 +187,22 @@ export const FrontOfficeDashboard: React.FC = () => {
       id: '', name: '', dob: '', entry_date: getTodayDate(), gender: Gender.Male, age: 0, mobile: '', occupation: '',
       hasInsurance: 'No', insuranceName: '', source: 'Google', sourceDoctorName: '', condition: Condition.Piles
     });
+    setOtherSourceDetail('');
     setEditingId(null);
     setStep(1);
     setLocalError(null);
   };
 
   const handleEdit = (p: Patient) => {
-    setFormData({ ...p });
+    let baseSource = p.source;
+    let detail = '';
+    if (p.source && p.source.startsWith('Other: ')) {
+      baseSource = 'Other';
+      detail = p.source.replace('Other: ', '');
+    }
+
+    setFormData({ ...p, source: baseSource });
+    setOtherSourceDetail(detail);
     setEditingId(p.id);
     setStep(1);
     setShowForm(true);
@@ -187,8 +216,8 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const sources = [
     "Google", "Facebook", "Instagram", "WhatsApp", "YouTube", 
-    "Website", "Doctor Recommended", "Old Patient / Family / Friend", 
-    "Hospital Board / Signage", "Other"
+    "Website", "Doctor Recommended", "Old Patient / Friends / Relatives", 
+    "Saw Hospital Board Outside", "Other"
   ];
 
   // Enhanced Filter Logic: Name, Mobile, or File ID
@@ -459,122 +488,165 @@ export const FrontOfficeDashboard: React.FC = () => {
       {/* Main Registration Form Overlay */}
       {showForm && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-8 py-6 bg-slate-50 border-b flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="bg-hospital-100 p-2.5 rounded-2xl">
-                   <User className="w-6 h-6 text-hospital-600" />
+          <div className="w-full max-w-7xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-10 py-8 bg-slate-50 border-b flex items-center justify-between">
+              <div className="flex items-center gap-5">
+                <div className="bg-hospital-100 p-3 rounded-2xl">
+                   <User className="w-8 h-8 text-hospital-600" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900">{editingId ? 'Update Registry Profile' : 'New Patient Registration'}</h1>
-                  <p className="text-xs text-slate-400 font-medium">Step {step} of 2 • {step === 1 ? 'Core Demographics' : 'Registry Assignment'}</p>
+                  <h1 className="text-2xl font-bold text-slate-900">{editingId ? 'Update Registry Profile' : 'New Patient Registration'}</h1>
+                  <p className="text-sm text-slate-400 font-medium">Step {step} of 2 • {step === 1 ? 'Core Demographics' : 'Registry Assignment'}</p>
                 </div>
               </div>
               <button onClick={() => { setShowForm(false); setActiveTab('HISTORY'); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
+                <X className="w-8 h-8 text-slate-400" />
               </button>
             </div>
 
-            <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-8 space-y-8">
+            <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-12 space-y-12">
               {step === 1 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in slide-in-from-left-4 duration-300">
-                  <div className="space-y-6">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block border-b pb-2">1. Identity</label>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-14 animate-in slide-in-from-left-4 duration-300">
+                  <div className="space-y-8">
+                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">1. Identity</label>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Presentation Date *</label>
-                      <input required type="date" className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-hospital-700" value={formData.entry_date} onChange={e => setFormData({...formData, entry_date: e.target.value})} />
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Presentation Date *</label>
+                      <input required type="date" className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-hospital-700 text-base" value={formData.entry_date} onChange={e => setFormData({...formData, entry_date: e.target.value})} />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Full Legal Name *</label>
-                      <input required type="text" placeholder="First Last" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Full Legal Name *</label>
+                      <input required type="text" placeholder="First Last" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Age *</label>
-                        <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.age || ''} onChange={e => setFormData({...formData, age: Number(e.target.value)})} />
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Age *</label>
+                        <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.age || ''} onChange={e => setFormData({...formData, age: Number(e.target.value)})} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">Gender *</label>
-                        <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-3 tracking-widest">Gender *</label>
+                        <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
                           {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block border-b pb-2">2. Contact & Billing</label>
+                  <div className="space-y-8">
+                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">2. Contact & Billing</label>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Mobile *</label>
-                      <input required type="tel" placeholder="10-digit number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} />
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Mobile *</label>
+                      <input required type="tel" placeholder="10-digit number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Primary Occupation</label>
-                      <input type="text" placeholder="e.g. Professional" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Primary Occupation</label>
+                      <input type="text" placeholder="e.g. Professional" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">Insurance Cover</label>
-                      <div className="flex gap-2">
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Insurance Cover</label>
+                      <div className="flex gap-3">
                         {['Yes', 'No', 'Not Sure'].map(opt => (
-                          <button key={opt} type="button" onClick={() => setFormData({...formData, hasInsurance: opt as any})} className={`flex-1 py-2 text-[10px] font-bold rounded-xl border-2 transition-all ${formData.hasInsurance === opt ? 'bg-hospital-500 border-hospital-500 text-white shadow-md shadow-hospital-100' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                          <button key={opt} type="button" onClick={() => {
+                            setFormData({...formData, hasInsurance: opt as any});
+                            if (opt !== 'Yes') setFormData(prev => ({...prev, insuranceName: ''}));
+                          }} className={`flex-1 py-3 text-xs font-bold rounded-xl border-2 transition-all ${formData.hasInsurance === opt ? 'bg-hospital-500 border-hospital-500 text-white shadow-md shadow-hospital-100' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
                             {opt}
                           </button>
                         ))}
                       </div>
+
+                      {formData.hasInsurance === 'Yes' && (
+                        <div className="animate-in slide-in-from-top-2 duration-200 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 mt-4">
+                          <label className="block text-xs font-bold text-emerald-600 uppercase mb-2 tracking-widest">Insurance Provider Name *</label>
+                          <div className="relative">
+                             <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
+                             <input required type="text" placeholder="e.g. Star Health, LIC..." className="w-full pl-12 pr-5 py-3.5 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-base text-slate-700" value={formData.insuranceName || ''} onChange={e => setFormData({...formData, insuranceName: e.target.value})} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block border-b pb-2">3. Referral & Clinical</label>
+                  <div className="space-y-8">
+                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">3. Referral & Clinical</label>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">Clinical Condition *</label>
-                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Clinical Condition *</label>
+                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
                         {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-widest">Lead Source</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {sources.slice(0, 6).map(s => (
-                          <label key={s} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
-                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => setFormData({...formData, source: s})} />
-                            <span className="text-[9px] truncate tracking-tight">{s}</span>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Lead Source *</label>
+                      <div className="grid grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                        {sources.map(s => (
+                          <label key={s} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => { 
+                              setFormData({...formData, source: s, sourceDoctorName: ''});
+                              if (s !== 'Other') setOtherSourceDetail('');
+                            }} />
+                            <span className="text-[11px] truncate tracking-tight">{s}</span>
                           </label>
                         ))}
                       </div>
                     </div>
+
+                    {formData.source === 'Doctor Recommended' && (
+                      <div className="animate-in slide-in-from-top-2 duration-200 bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
+                        <label className="block text-xs font-bold text-blue-600 uppercase mb-2 tracking-widest">Referral Doctor Name *</label>
+                        <div className="relative">
+                           <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />
+                           <input required type="text" placeholder="Dr. First Last" className="w-full pl-12 pr-5 py-3.5 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-base text-slate-700" value={formData.sourceDoctorName} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.source === 'Other' && (
+                      <div className="animate-in slide-in-from-top-2 duration-200 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest">Specify Source Details *</label>
+                        <div className="relative">
+                           <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                           <input required type="text" placeholder="Specify source details..." className="w-full pl-12 pr-5 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-base text-slate-700" value={otherSourceDetail} onChange={e => setOtherSourceDetail(e.target.value)} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="max-w-3xl mx-auto space-y-10 animate-in slide-in-from-right-4 duration-300">
-                  <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Patient Name</label>
-                      <div className="text-xl font-bold text-slate-900">{formData.name}</div>
+                <div className="max-w-4xl mx-auto space-y-14 animate-in slide-in-from-right-4 duration-300">
+                  <div className="bg-slate-50 rounded-3xl p-10 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-16">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Patient Name</label>
+                      <div className="text-2xl font-bold text-slate-900">{formData.name}</div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mobile No</label>
-                      <div className="text-xl font-bold text-slate-900">{formData.mobile}</div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Mobile No</label>
+                      <div className="text-2xl font-bold text-slate-900">{formData.mobile}</div>
                     </div>
                   </div>
-                  <div className="space-y-4 text-center">
-                    <label className="block text-xs font-bold text-hospital-600 uppercase tracking-widest mb-4">Registry File ID Assignment *</label>
-                    <input required disabled={!!editingId} type="text" placeholder="HIMAS-XXX" className="w-full max-w-md mx-auto border-b-4 py-4 focus:outline-none text-5xl font-mono uppercase font-bold text-center border-hospital-500 transition-colors bg-transparent placeholder:text-slate-100" value={formData.id} onChange={e => { setFormData({...formData, id: e.target.value}); setLocalError(null); }} />
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Unique Physical File Identifier</p>
+                  <div className="space-y-6 text-center">
+                    <label className="block text-sm font-bold text-hospital-600 uppercase tracking-widest mb-6">Registry File ID Assignment *</label>
+                    <input required disabled={!!editingId} type="text" placeholder="HIMAS-XXX" className="w-full max-w-lg mx-auto border-b-4 py-6 focus:outline-none text-6xl font-mono uppercase font-bold text-center border-hospital-500 transition-colors bg-transparent placeholder:text-slate-100" value={formData.id} onChange={e => { setFormData({...formData, id: e.target.value}); setLocalError(null); }} />
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unique Physical File Identifier</p>
                   </div>
                 </div>
               )}
 
-              <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <button type="button" onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="w-full sm:w-auto text-slate-400 font-bold px-8 py-3 hover:text-slate-600 transition-colors">
+              {localError && (
+                <div className="p-5 bg-red-50 text-red-600 text-sm font-bold rounded-2xl flex items-center gap-4 animate-pulse">
+                  <AlertCircle className="w-6 h-6 flex-shrink-0" />
+                  {localError}
+                </div>
+              )}
+
+              <div className="pt-10 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-6">
+                <button type="button" onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="w-full sm:w-auto text-slate-400 font-bold px-10 py-4 hover:text-slate-600 transition-colors text-base">
                   {step === 1 ? 'Cancel' : 'Go Back'}
                 </button>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="w-full sm:w-auto bg-hospital-600 text-white px-12 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-hospital-100 hover:bg-hospital-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="w-full sm:w-auto bg-hospital-600 text-white px-16 py-4.5 rounded-2xl font-bold flex items-center justify-center gap-4 shadow-xl shadow-hospital-100 hover:bg-hospital-700 transition-all active:scale-95 disabled:opacity-50 text-base"
                 >
-                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>{step === 1 ? 'Confirm Details' : (editingId ? 'Save Changes' : 'Finalize Entry')}</span>}
+                  {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>{step === 1 ? 'Confirm Details' : (editingId ? 'Save Changes' : 'Finalize Entry')}</span>}
                 </button>
               </div>
             </form>
