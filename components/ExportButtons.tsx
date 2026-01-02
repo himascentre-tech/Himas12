@@ -43,7 +43,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
     const headers = [
       'File Registration No', 'Name', 'Entry Date (DOP)', 'Gender', 'Age', 'Phone Number', 
       'Condition', 'Surgeon Code', 'Surgery Procedure', 'Proposal Status', 
-      'Follow Up Date', 'Outcome Date', 'Surgery Fixed Date', 'Surgery Lost Date'
+      'Follow Up Visit Date', 'Next Follow Up Date', 'Outcome Date', 'Surgery Fixed Date', 'Surgery Lost Date'
     ];
 
     const rows = filteredPatients.map(p => {
@@ -58,7 +58,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       return [
         p.id, p.name, p.entry_date || '', p.gender, p.age, p.mobile, p.condition,
         p.doctorAssessment?.quickCode || '', proc, status || 'New',
-        p.packageProposal?.followUpDate || '', outcomeDate,
+        p.lastFollowUpVisitDate || '', p.packageProposal?.followUpDate || '', outcomeDate,
         status === ProposalStatus.SurgeryFixed ? outcomeDate : '',
         status === ProposalStatus.SurgeryLost ? outcomeDate : ''
       ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(',');

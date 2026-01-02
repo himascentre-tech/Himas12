@@ -64,11 +64,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearError = () => setLastErrorMessage(null);
   const forceStopLoading = () => setIsLoading(false);
 
-  // EXPLICIT MAPPING: DB (snake_case) -> APP (camelCase)
+  const formatError = (e: any): string => {
+    if (typeof e === 'string') return e;
+    if (e?.message) return e.message;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return String(e);
+    }
+  };
+
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
     
-    // Ensure JSON fields are handled if they come back as strings (though usually objects in supabase-js)
     const doctorAssessment = typeof item.doctor_assessment === 'string' 
       ? JSON.parse(item.doctor_assessment) 
       : item.doctor_assessment;
@@ -94,11 +102,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       condition: item.condition || 'Other',
       created_at: item.created_at,
       doctorAssessment: doctorAssessment || null,
-      packageProposal: packageProposal || null
+      packageProposal: packageProposal || null,
+      isFollowUpVisit: !!item.is_follow_up,
+      lastFollowUpVisitDate: item.last_follow_up_visit_date || null
     };
   };
 
-  // EXPLICIT MAPPING: APP (camelCase) -> DB (snake_case)
   const mapPatientToDB = (p: any) => {
     return {
       id: p.id,
@@ -116,7 +125,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       source_doctor_name: p.sourceDoctorName || null,
       condition: p.condition,
       doctor_assessment: p.doctorAssessment || null,
-      package_proposal: p.packageProposal || null
+      package_proposal: p.packageProposal || null,
+      is_follow_up: p.isFollowUpVisit || false,
+      last_follow_up_visit_date: p.lastFollowUpVisitDate || null
     };
   };
 
@@ -170,7 +181,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setLastSavedAt(new Date());
     } catch (e: any) {
       console.error("Data Loading Error:", e);
-      setLastErrorMessage(e.message);
+      setLastErrorMessage(formatError(e));
       setSaveStatus('error');
     } finally {
       if (!isBackground) setIsLoading(false);
@@ -204,14 +215,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const mapped = mapPatientFromDB(data);
       if (mapped) {
         setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
-        // Critical: Sync to sheets after state is updated locally
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       
       setSaveStatus('saved');
     } catch (err: any) {
       console.error("Detailed Update Error:", err);
-      setLastErrorMessage(err.message);
+      setLastErrorMessage(formatError(err));
       setSaveStatus('error');
       throw err;
     }
@@ -239,7 +249,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
           setSaveStatus('saved');
         } catch (err: any) {
-          setLastErrorMessage(err.message);
+          setLastErrorMessage(formatError(err));
           setSaveStatus('error');
           throw err;
         }
@@ -251,12 +261,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (error) throw error;
           setPatients(prev => prev.filter(p => p.id !== id));
         } catch (err: any) {
-          console.error("Delete Error:", err.message);
+          console.error("Delete Error:", formatError(err));
         }
       },
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(p => p.id === pid);
-        if (p) await updatePatient({ ...p, doctorAssessment: ass });
+        if (p) {
+          await updatePatient({ 
+            ...p, 
+            doctorAssessment: ass,
+            isFollowUpVisit: false 
+          });
+        }
       }, 
       updatePackageProposal: async (pid, prop) => {
         const p = patients.find(p => p.id === pid);

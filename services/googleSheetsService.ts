@@ -14,9 +14,6 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       surgeryProcedureValue = `Other: ${patient.doctorAssessment.otherSurgeryName}`;
     }
 
-    // We MUST match these exactly for the Apps Script row coloring logic
-    // ProposalStatus.SurgeryFixed is "Surgery Fixed"
-    // ProposalStatus.SurgeryLost is "Surgery Lost"
     const currentStatus = patient.packageProposal?.status || "Pending Counseling";
     const outcomeDate = patient.packageProposal?.outcomeDate || "N/A";
 
@@ -24,7 +21,7 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       // Identity & Contact
       id: patient.id,
       name: patient.name,
-      entry_date: patient.entry_date,
+      entry_date: patient.entry_date, // DOP
       age: patient.age,
       gender: patient.gender,
       mobile: patient.mobile,
@@ -45,17 +42,19 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       doctor_signature: patient.doctorAssessment?.doctorSignature || "N/A",
       
       // Counseling & Conversion
-      // This field is used by Apps Script to set the row color
       status: currentStatus, 
       decision_pattern: patient.packageProposal?.decisionPattern || "N/A",
       objection: patient.packageProposal?.objectionIdentified || "N/A",
       strategy: patient.packageProposal?.counselingStrategy || "N/A",
-      follow_up: patient.packageProposal?.followUpDate || "N/A",
+      
+      // Follow-up Tracking (Added for Google Sheet mapping)
+      follow_up_visit_date: patient.lastFollowUpVisitDate || "N/A",
+      next_follow_up_date: patient.packageProposal?.followUpDate || "N/A",
+      
       last_follow_up_at: patient.packageProposal?.lastFollowUpAt || "N/A",
       outcome_date: outcomeDate,
 
       // Specific Outcome Columns for Google Sheet display
-      // Mapping 'surgery_date' specifically as requested
       surgery_date: currentStatus === ProposalStatus.SurgeryFixed ? outcomeDate : "N/A",
       surgery_fixed_date: currentStatus === ProposalStatus.SurgeryFixed ? outcomeDate : "N/A",
       surgery_lost_date: currentStatus === ProposalStatus.SurgeryLost ? outcomeDate : "N/A",
@@ -65,8 +64,6 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
 
     console.log(`📊 Syncing [${patient.id}] to Sheets. Status: "${currentStatus}"`);
 
-    // We use 'text/plain' because it is a "simple" content type allowed in 'no-cors' mode
-    // Apps Script JSON.parse(e.postData.contents) handles this perfectly.
     await fetch(WEBHOOK_URL, {
       method: 'POST',
       mode: 'no-cors',

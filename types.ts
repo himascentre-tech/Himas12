@@ -104,6 +104,8 @@ export interface Patient {
   created_at: string; 
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
+  isFollowUpVisit?: boolean; 
+  lastFollowUpVisitDate?: string; 
 }
 
 export interface StaffUser {
