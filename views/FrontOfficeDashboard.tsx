@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -127,13 +128,12 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     clearError();
 
-    if (!editingId && (!formData.id || formData.id.trim().length === 0)) {
-        setLocalError("Please provide a File Registration ID.");
-        return;
-    }
+    // The Registry ID is now non-mandatory, but we need something for the DB if it's the primary key.
+    // If the user left it blank, we will auto-generate one based on time to satisfy unique constraints.
+    const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
-    if (!editingId && patients.some(p => p.id.toLowerCase() === formData.id?.trim().toLowerCase())) {
-      setLocalError(`Patient File ID "${formData.id}" is already registered.`);
+    if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
+      setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
     }
 
@@ -141,15 +141,16 @@ export const FrontOfficeDashboard: React.FC = () => {
     
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
-      const submissionData = { ...formData, source: finalSource };
+      const submissionData = { ...formData, source: finalSource, id: finalId };
 
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          await updatePatient({ ...original, ...submissionData as Patient });
+          // Use editingId as oldId to allow renaming the primary key 'id'
+          await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         }
       } else {
-        await addPatient({ ...submissionData, id: formData.id?.trim().toUpperCase() } as any);
+        await addPatient(submissionData as any);
       }
       
       setShowForm(false);
@@ -611,21 +612,29 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto space-y-14 animate-in slide-in-from-right-4 duration-300">
-                  <div className="bg-slate-50 rounded-3xl p-10 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-16">
+                <div className="max-w-5xl mx-auto space-y-14 animate-in slide-in-from-right-4 duration-300">
+                  <div className="bg-slate-50 rounded-3xl p-10 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-4 gap-y-10 gap-x-12">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Patient Name</label>
-                      <div className="text-2xl font-bold text-slate-900">{formData.name}</div>
+                      <div className="text-2xl font-bold text-slate-900 truncate">{formData.name}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Age</label>
+                      <div className="text-2xl font-bold text-slate-900">{formData.age} yrs</div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Mobile No</label>
                       <div className="text-2xl font-bold text-slate-900">{formData.mobile}</div>
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Condition</label>
+                      <div className="text-2xl font-bold text-hospital-600">{formData.condition}</div>
+                    </div>
                   </div>
                   <div className="space-y-6 text-center">
-                    <label className="block text-sm font-bold text-hospital-600 uppercase tracking-widest mb-6">Registry File ID Assignment *</label>
-                    <input required disabled={!!editingId} type="text" placeholder="HIMAS-XXX" className="w-full max-w-lg mx-auto border-b-4 py-6 focus:outline-none text-6xl font-mono uppercase font-bold text-center border-hospital-500 transition-colors bg-transparent placeholder:text-slate-100" value={formData.id} onChange={e => { setFormData({...formData, id: e.target.value}); setLocalError(null); }} />
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unique Physical File Identifier</p>
+                    <label className="block text-sm font-bold text-hospital-600 uppercase tracking-widest mb-6">Registry File ID Assignment</label>
+                    <input type="text" placeholder="HIMAS-XXX" className="w-full max-w-lg mx-auto border-b-4 py-6 focus:outline-none text-6xl font-mono uppercase font-bold text-center border-hospital-500 transition-colors bg-transparent placeholder:text-slate-100" value={formData.id} onChange={e => { setFormData({...formData, id: e.target.value}); setLocalError(null); }} />
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unique Physical File Identifier (Optional)</p>
                   </div>
                 </div>
               )}

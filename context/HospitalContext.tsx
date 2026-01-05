@@ -9,7 +9,7 @@ interface HospitalContextType {
   setCurrentUserRole: (role: Role) => void;
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'created_at' | 'hospital_id'>) => Promise<void>; 
-  updatePatient: (patient: Patient) => Promise<void>;
+  updatePatient: (patient: Patient, oldId?: string) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
@@ -204,15 +204,17 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => { if (pollingInterval.current) clearInterval(pollingInterval.current); };
   }, [currentUserRole, loadData]);
 
-  const updatePatient = async (updatedPatient: Patient) => {
+  const updatePatient = async (updatedPatient: Patient, oldId?: string) => {
     setSaveStatus('saving');
     clearError();
     try {
       const dbPayload = mapPatientToDB(updatedPatient);
+      const targetId = oldId || dbPayload.id;
+
       const { data, error } = await supabase
         .from('himas_data')
         .update(dbPayload)
-        .eq('id', dbPayload.id)
+        .eq('id', targetId)
         .select()
         .single();
 
@@ -220,7 +222,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
-        setPatients(prev => prev.map(p => p.id === updatedPatient.id ? mapped : p));
+        setPatients(prev => prev.map(p => p.id === targetId ? mapped : p));
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       
