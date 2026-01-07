@@ -7,7 +7,8 @@ import {
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
   Download, ChevronRight, Stethoscope, User, Activity, 
   ShieldCheck, Phone, MapPin, AlertCircle, TrendingUp,
-  DollarSign, Clock, XCircle, Info, CheckCircle2
+  DollarSign, Clock, XCircle, Info, CheckCircle2,
+  Globe, Briefcase as OccupationIcon
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -38,8 +39,11 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // Helper for IST time
-  const getISTTimestamp = () => {
+  // Standard Date helper (YYYY-MM-DD)
+  const getISODate = () => new Date().toISOString().split('T')[0];
+  
+  // Display helper for IST time (Visual only)
+  const getISTDisplayTime = () => {
     return new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   };
 
@@ -54,17 +58,19 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
+      // 1. Basic eligibility: Patient must have an assessment that isn't Medication Only
       if (!p.doctorAssessment || p.doctorAssessment.quickCode === SurgeonCode.M1) return false;
 
       const status = p.packageProposal?.status || ProposalStatus.Pending;
       let matchesTab = false;
       let targetDate = '';
 
+      // 2. Tab Selection Logic
       if (counselingFilter === 'PENDING') {
         matchesTab = status === ProposalStatus.Pending;
         targetDate = p.entry_date;
       } else if (counselingFilter === 'DUE_FOLLOWUPS') {
-        matchesTab = status === ProposalStatus.FollowUp && (p.packageProposal?.followUpDate || '') <= today;
+        matchesTab = status === ProposalStatus.FollowUp;
         targetDate = p.packageProposal?.followUpDate || '';
       } else if (counselingFilter === 'CONVERTED') {
         matchesTab = status === ProposalStatus.SurgeryFixed;
@@ -78,8 +84,14 @@ export const PackageTeamDashboard: React.FC = () => {
       }
 
       if (!matchesTab) return false;
-      if (startDate && targetDate < startDate) return false;
-      if (endDate && targetDate > endDate) return false;
+
+      // 3. Date Filtering
+      if (targetDate) {
+        if (startDate && targetDate < startDate) return false;
+        if (endDate && targetDate > endDate) return false;
+      } else if (startDate || endDate) {
+        return false;
+      }
 
       return true;
     }).sort((a, b) => {
@@ -135,15 +147,16 @@ export const PackageTeamDashboard: React.FC = () => {
 
     if (!validateAction(newStatus)) return;
 
-    const istTime = getISTTimestamp();
+    const isoDate = getISODate();
+    const istDisplay = getISTDisplayTime();
     const isClosing = newStatus === ProposalStatus.SurgeryFixed;
     
     await updatePackageProposal(selectedPatient.id, {
       ...proposal as PackageProposal,
       status: newStatus,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
-      lastFollowUpAt: istTime,
-      outcomeDate: isClosing ? proposal.outcomeDate : (proposal.outcomeDate || today)
+      lastFollowUpAt: istDisplay,
+      outcomeDate: isClosing ? proposal.outcomeDate : (proposal.outcomeDate || isoDate)
     });
     
     setSelectedPatient(null);
@@ -154,7 +167,8 @@ export const PackageTeamDashboard: React.FC = () => {
       return;
     }
 
-    const istTime = getISTTimestamp();
+    const isoDate = getISODate();
+    const istDisplay = getISTDisplayTime();
     const finalReason = lostReason === 'Other' ? `Other: ${lostOtherNote}` : lostReason;
     
     await updatePackageProposal(selectedPatient!.id, {
@@ -162,8 +176,8 @@ export const PackageTeamDashboard: React.FC = () => {
       status: ProposalStatus.SurgeryLost,
       objectionIdentified: finalReason,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
-      outcomeDate: istTime,
-      lastFollowUpAt: istTime
+      outcomeDate: isoDate,
+      lastFollowUpAt: istDisplay
     });
 
     setShowLostModal(false);
@@ -199,14 +213,13 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Filters Bar */}
           <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
             <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-x-auto">
               <button onClick={() => setCounselingFilter('PENDING')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
                 <Clock className="w-4 h-4" /> New Candidates
               </button>
               <button onClick={() => setCounselingFilter('DUE_FOLLOWUPS')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}>
-                <Calendar className="w-4 h-4" /> Due Follow-ups
+                <Calendar className="w-4 h-4" /> All Follow-ups
               </button>
               <button onClick={() => setCounselingFilter('CONVERTED')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'CONVERTED' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
                 <Trophy className="w-4 h-4" /> Surgery Fixed
@@ -223,7 +236,6 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
 
           <div className="flex h-[calc(100vh-280px)] gap-6">
-            {/* Sidebar Queue */}
             <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
               <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 <span>Clinical Conversion List</span>
@@ -241,15 +253,14 @@ export const PackageTeamDashboard: React.FC = () => {
                     <div className="text-[10px] font-bold text-slate-400 flex flex-wrap gap-2">
                       <span className="text-hospital-600 uppercase">{p.condition}</span>
                       <span>•</span>
-                      <span>Age: {p.age}</span>
+                      <span>ID: {p.id}</span>
                     </div>
                   </div>
                 ))}
-                {filteredPatients.length === 0 && <div className="p-12 text-center text-slate-300 italic text-sm">No records found for filter</div>}
+                {filteredPatients.length === 0 && <div className="p-12 text-center text-slate-300 italic text-sm">No records match filters</div>}
               </div>
             </div>
 
-            {/* Assessment Panel */}
             <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
               {selectedPatient ? (
                 <div className="flex flex-col h-full">
@@ -260,62 +271,84 @@ export const PackageTeamDashboard: React.FC = () => {
                         <h3 className="text-xl font-bold text-slate-900 tracking-tight">{selectedPatient.name}</h3>
                         <div className="flex gap-4 mt-1">
                           <span className="text-xs font-bold text-slate-500">{selectedPatient.age} yrs • {selectedPatient.gender}</span>
-                          <span className="text-xs font-mono font-bold text-hospital-600 bg-hospital-50 px-2 rounded">{selectedPatient.id}</span>
+                          <span className="text-xs font-mono font-bold text-hospital-600 bg-hospital-50 px-2 rounded">{selectedPatient.condition}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Recommendation</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Doctor Recommendation</span>
                       <span className="bg-hospital-600 text-white px-3 py-1 rounded-lg text-[10px] font-black">{selectedPatient.doctorAssessment?.quickCode}</span>
                     </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                    {/* Clinical Details Context */}
-                    <div className="bg-hospital-50/30 rounded-3xl border border-hospital-100 p-6">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Stethoscope className="w-4 h-4 text-hospital-600" />
-                        <h4 className="text-xs font-bold text-hospital-700 uppercase tracking-widest">Surgeon's Insight</h4>
+                    {/* Key Attributes Summary */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          <Globe className="w-3 h-3" /> Source
+                        </label>
+                        <div className="text-xs font-black text-slate-800 truncate">{selectedPatient.source || 'N/A'}</div>
                       </div>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          <ShieldCheck className="w-3 h-3" /> Insurance
+                        </label>
+                        <div className="text-xs font-black text-slate-800">{selectedPatient.hasInsurance || 'N/A'}</div>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          <OccupationIcon className="w-3 h-3" /> Occupation
+                        </label>
+                        <div className="text-xs font-black text-slate-800 truncate">{selectedPatient.occupation || 'N/A'}</div>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          <Phone className="w-3 h-3" /> Mobile
+                        </label>
+                        <div className="text-xs font-black text-slate-800">{selectedPatient.mobile || 'N/A'}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-hospital-50/40 rounded-3xl border border-hospital-100 p-6">
                       <div className="grid grid-cols-3 gap-6">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">Procedure</label>
-                          <div className="text-sm font-bold text-slate-800">{getProcedureDisplay(selectedPatient)}</div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Procedure Recommendation</label>
+                          <div className="text-sm font-black text-slate-800">{getProcedureDisplay(selectedPatient)}</div>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">Pain / Severity</label>
-                          <div className="text-sm font-bold text-amber-600 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {selectedPatient.doctorAssessment?.painSeverity}</div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pain Severity</label>
+                          <div className="text-sm font-black text-amber-600 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {selectedPatient.doctorAssessment?.painSeverity}</div>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">Financial Grade</label>
-                          <div className="text-sm font-bold text-emerald-600 flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> {selectedPatient.doctorAssessment?.affordability}</div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Affordability</label>
+                          <div className="text-sm font-black text-emerald-600 flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> {selectedPatient.doctorAssessment?.affordability}</div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Action Selection Forms */}
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 gap-6">
                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Decision Profile</label>
-                            <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" value={proposal.decisionPattern} onChange={e => setProposal({...proposal, decisionPattern: e.target.value})}>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Decision Pattern</label>
+                            <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white outline-none focus:border-hospital-500" value={proposal.decisionPattern} onChange={e => setProposal({...proposal, decisionPattern: e.target.value})}>
                               <option>Standard</option><option>Price Sensitive</option><option>Needs Consult</option><option>Quick Conversion</option>
                             </select>
                          </div>
                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Objection</label>
-                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" placeholder="e.g. Cost, Fear..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Objection</label>
+                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white outline-none focus:border-hospital-500" placeholder="e.g. Cost, Fear..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
                          </div>
                       </div>
 
                       <div className="space-y-3">
                          <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Counseling Approach</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Counseling Strategy</label>
                             <button onClick={handleGenerateAIStrategy} disabled={aiLoading} className="text-[9px] font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50">
                               {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI STRATEGY
                             </button>
                          </div>
-                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[100px]" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Draft the patient counseling approach..." />
+                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[120px] focus:border-hospital-500" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Draft the patient counseling approach..." />
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
@@ -323,13 +356,13 @@ export const PackageTeamDashboard: React.FC = () => {
                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                              <Calendar className="w-3 h-3" /> Next Follow-up Date *
                            </label>
-                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-slate-700 ${validationError?.includes('follow-up') ? 'border-red-300 bg-red-50' : 'border-slate-100'}`} value={proposal.followUpDate} onChange={e => { setProposal({...proposal, followUpDate: e.target.value}); setValidationError(null); }} />
+                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-slate-700 outline-none ${validationError?.includes('follow-up') ? 'border-red-300 bg-red-50' : 'border-slate-100 focus:border-hospital-500'}`} value={proposal.followUpDate} onChange={e => { setProposal({...proposal, followUpDate: e.target.value}); setValidationError(null); }} />
                         </div>
                         <div className="space-y-2">
                            <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
                              <CheckCircle2 className="w-3 h-3" /> Surgery Date (Fixed Only) *
                            </label>
-                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-emerald-700 ${validationError?.includes('Surgery Date') ? 'border-red-300 bg-red-50' : 'border-emerald-100'}`} value={proposal.outcomeDate || ''} onChange={e => { setProposal({...proposal, outcomeDate: e.target.value}); setValidationError(null); }} />
+                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-emerald-700 outline-none ${validationError?.includes('Surgery Date') ? 'border-red-300 bg-red-50' : 'border-emerald-100 focus:border-emerald-500'}`} value={proposal.outcomeDate || ''} onChange={e => { setProposal({...proposal, outcomeDate: e.target.value}); setValidationError(null); }} />
                         </div>
                       </div>
                     </div>
