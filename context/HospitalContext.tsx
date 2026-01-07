@@ -85,10 +85,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       ? JSON.parse(item.package_proposal) 
       : item.package_proposal;
 
-    if (item.notes && doctorAssessment) {
-      doctorAssessment.notes = item.notes;
-    }
-
     return {
       id: item.id,
       hospital_id: item.hospital_id,
@@ -107,7 +103,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       created_at: item.created_at,
       doctorAssessment: doctorAssessment || null,
       packageProposal: packageProposal || null,
-      isFollowUpVisit: !!item.is_follow_up,
+      isFollowUpVisit: Boolean(item.is_follow_up),
       lastFollowUpVisitDate: item.last_follow_up_visit_date || null
     };
   };
@@ -128,9 +124,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       source: p.source,
       source_doctor_name: p.sourceDoctorName || null,
       condition: p.condition,
-      doctor_assessment: p.doctorAssessment || null,
-      package_proposal: p.packageProposal || null,
-      is_follow_up: p.isFollowUpVisit || false,
+      doctor_assessment: p.doctorAssessment === undefined || p.doctorAssessment === null ? null : p.doctorAssessment,
+      package_proposal: p.packageProposal === undefined || p.packageProposal === null ? null : p.packageProposal,
+      is_follow_up: p.isFollowUpVisit === true,
       last_follow_up_visit_date: p.lastFollowUpVisitDate || null,
       notes: p.doctorAssessment?.notes || null
     };
@@ -217,11 +213,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
-        if (oldId && oldId !== updatedPatient.id) {
-          setPatients(prev => prev.map(p => p.id === oldId ? mapped : p));
-        } else {
-          setPatients(prev => prev.map(p => p.id === targetId ? mapped : p));
-        }
+        setPatients(prev => {
+          const filtered = prev.filter(p => p.id !== (oldId || targetId));
+          return [mapped, ...filtered].sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
+        });
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       

@@ -15,7 +15,7 @@ import {
 type TabType = 'NEW' | 'HISTORY' | 'OLD';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, lastErrorMessage, clearError } = useHospital();
+  const { patients, addPatient, updatePatient, refreshData, lastErrorMessage, clearError } = useHospital();
   const [activeTab, setActiveTab] = useState<TabType>('HISTORY');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,18 +107,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please fill in Name, Mobile, and Age.");
       return;
     }
-    if (formData.hasInsurance === 'Yes' && !formData.insuranceName?.trim()) {
-      setLocalError("Please specify the Insurance Provider Name.");
-      return;
-    }
-    if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName?.trim()) {
-      setLocalError("Referral Doctor Name is required for Doctor Recommended source.");
-      return;
-    }
-    if (formData.source === 'Other' && !otherSourceDetail.trim()) {
-      setLocalError("Please specify the source details.");
-      return;
-    }
     setStep(2);
   };
 
@@ -164,13 +152,18 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     try {
       const timestamp = `${revisitData.date} ${revisitData.time}`;
-      // When a patient revisits, we clear their doctor assessment to put them back in the clinical queue
+      
+      // LOGIC: To force the patient back to the Doctor's Queue, we:
+      // 1. Set isFollowUpVisit = true
+      // 2. Clear doctorAssessment (set to null)
       await updatePatient({
         ...revisitPatient,
         isFollowUpVisit: true,
         lastFollowUpVisitDate: timestamp,
-        doctorAssessment: undefined // Put back in queue
+        doctorAssessment: null as any // Reset assessment to force back into Clinical Queue
       });
+      
+      await refreshData();
       setRevisitPatient(null);
       setActiveTab('HISTORY');
       setSelectedHistoryDate(revisitData.date);
@@ -346,17 +339,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {historyOPDList.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-24 text-center">
-                      <div className="bg-slate-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6 border border-slate-100">
-                        <Users className="w-10 h-10 text-slate-200" />
-                      </div>
-                      <p className="text-slate-400 text-sm font-bold">No visits recorded for this date.</p>
-                      <button onClick={() => setSelectedHistoryDate(getTodayDate())} className="text-hospital-600 text-[10px] uppercase font-bold tracking-widest mt-2 hover:underline">Return to Today</button>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
@@ -443,10 +425,9 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       ) : null}
 
-      {/* Log Revisit Modal */}
       {revisitPatient && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+           <div className="bg-white w-full max-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
              <div className="p-6 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="bg-white p-2 rounded-xl shadow-sm border border-amber-200">
@@ -497,13 +478,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                {localError && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-red-600 text-[10px] font-bold">
-                    <AlertCircle className="w-4 h-4" />
-                    {localError}
-                  </div>
-                )}
              </div>
 
              <div className="p-6 bg-slate-50 border-t flex gap-4">
@@ -536,7 +510,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900">{editingId ? 'Update Registry Profile' : 'New Patient Registration'}</h1>
-                  <p className="text-sm text-slate-400 font-medium">Step {step} of 2 • {step === 1 ? 'Core Demographics' : 'Registry Assignment'}</p>
+                  <p className="text-sm text-slate-400 font-medium">Step {step} of 2</p>
                 </div>
               </div>
               <button onClick={() => { setShowForm(false); setActiveTab('HISTORY'); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
@@ -546,25 +520,25 @@ export const FrontOfficeDashboard: React.FC = () => {
 
             <form onSubmit={step === 1 ? handleNextStep : handleSubmit} className="p-12 space-y-12">
               {step === 1 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-14 animate-in slide-in-from-left-4 duration-300">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-14">
                   <div className="space-y-8">
                     <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">1. Identity</label>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Presentation Date *</label>
-                      <input required type="date" className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-hospital-700 text-base" value={formData.entry_date} onChange={e => setFormData({...formData, entry_date: e.target.value})} />
+                      <input required type="date" className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-5 py-3.5 font-bold text-hospital-700 text-base" value={formData.entry_date} onChange={e => setFormData({...formData, entry_date: e.target.value})} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Full Legal Name *</label>
-                      <input required type="text" placeholder="First Last" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                      <input required type="text" placeholder="First Last" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                     </div>
                     <div className="grid grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Age *</label>
-                        <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.age || ''} onChange={e => setFormData({...formData, age: Number(e.target.value)})} />
+                        <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.age || ''} onChange={e => setFormData({...formData, age: Number(e.target.value)})} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-3 tracking-widest">Gender *</label>
-                        <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
+                        <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
                           {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                       </div>
@@ -575,33 +549,21 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">2. Contact & Billing</label>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Mobile *</label>
-                      <input required type="tel" placeholder="10-digit number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} />
+                      <input required type="tel" placeholder="10-digit number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Primary Occupation</label>
-                      <input type="text" placeholder="e.g. Professional" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
+                      <input type="text" placeholder="e.g. Professional" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Insurance Cover</label>
                       <div className="flex gap-3">
                         {['Yes', 'No', 'Not Sure'].map(opt => (
-                          <button key={opt} type="button" onClick={() => {
-                            setFormData({...formData, hasInsurance: opt as any});
-                            if (opt !== 'Yes') setFormData(prev => ({...prev, insuranceName: ''}));
-                          }} className={`flex-1 py-3 text-xs font-bold rounded-xl border-2 transition-all ${formData.hasInsurance === opt ? 'bg-hospital-500 border-hospital-500 text-white shadow-md shadow-hospital-100' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                          <button key={opt} type="button" onClick={() => setFormData({...formData, hasInsurance: opt as any})} className={`flex-1 py-3 text-xs font-bold rounded-xl border-2 transition-all ${formData.hasInsurance === opt ? 'bg-hospital-500 border-hospital-500 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400'}`}>
                             {opt}
                           </button>
                         ))}
                       </div>
-                      {formData.hasInsurance === 'Yes' && (
-                        <div className="animate-in slide-in-from-top-2 duration-200 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 mt-4">
-                          <label className="block text-xs font-bold text-emerald-600 uppercase mb-2 tracking-widest">Insurance Provider Name *</label>
-                          <div className="relative">
-                             <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
-                             <input required type="text" placeholder="e.g. Star Health, LIC..." className="w-full pl-12 pr-5 py-3.5 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-base text-slate-700" value={formData.insuranceName || ''} onChange={e => setFormData({...formData, insuranceName: e.target.value})} />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -609,19 +571,16 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block border-b pb-3">3. Referral & Clinical</label>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Clinical Condition *</label>
-                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-base" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
+                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
                         {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Lead Source *</label>
-                      <div className="grid grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                      <div className="grid grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-2">
                         {sources.map(s => (
-                          <label key={s} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
-                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => { 
-                              setFormData({...formData, source: s, sourceDoctorName: ''});
-                              if (s !== 'Other') setOtherSourceDetail('');
-                            }} />
+                          <label key={s} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400'}`}>
+                            <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => setFormData({...formData, source: s})} />
                             <span className="text-[11px] truncate tracking-tight">{s}</span>
                           </label>
                         ))}
@@ -630,7 +589,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="max-w-5xl mx-auto space-y-14 animate-in slide-in-from-right-4 duration-300">
+                <div className="max-w-5xl mx-auto space-y-14">
                   <div className="bg-slate-50 rounded-3xl p-10 border border-slate-100 shadow-inner grid grid-cols-1 md:grid-cols-4 gap-y-10 gap-x-12">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Patient Name</label>
@@ -645,14 +604,13 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <div className="text-2xl font-bold text-slate-900">{formData.mobile}</div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Condition</label>
+                      <label className="text-xs font-bold text-hospital-600 uppercase tracking-widest block">Condition</label>
                       <div className="text-2xl font-bold text-hospital-600">{formData.condition}</div>
                     </div>
                   </div>
                   <div className="space-y-6 text-center">
                     <label className="block text-sm font-bold text-hospital-600 uppercase tracking-widest mb-6">Registry File ID Assignment</label>
                     <input type="text" placeholder="HIMAS-XXX" className="w-full max-w-lg mx-auto border-b-4 py-6 focus:outline-none text-6xl font-mono uppercase font-bold text-center border-hospital-500 transition-colors bg-transparent placeholder:text-slate-100" value={formData.id} onChange={e => { setFormData({...formData, id: e.target.value}); setLocalError(null); }} />
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unique Physical File Identifier (Optional)</p>
                   </div>
                 </div>
               )}
