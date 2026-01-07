@@ -304,7 +304,7 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                          <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Objection</label>
-                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" placeholder="e.g. Budget, Timing..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
+                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" placeholder="e.g. Cost, Fear..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
                          </div>
                       </div>
 
@@ -312,10 +312,10 @@ export const PackageTeamDashboard: React.FC = () => {
                          <div className="flex justify-between items-center">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Counseling Approach</label>
                             <button onClick={handleGenerateAIStrategy} disabled={aiLoading} className="text-[9px] font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50">
-                              {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI ASSIST
+                              {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI STRATEGY
                             </button>
                          </div>
-                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[100px] italic" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Outline the strategy used for this patient..." />
+                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[100px]" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Draft the patient counseling approach..." />
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
@@ -391,10 +391,10 @@ export const PackageTeamDashboard: React.FC = () => {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">Select Primary Reason for Loss *</label>
                 <div className="space-y-3">
                   {[
-                    "Cost issue / High Package",
-                    "Patient not ready / Seeking medical management",
-                    "Fear of surgery / Second opinion needed",
-                    "Chose another hospital / Local clinic",
+                    "Cost issue",
+                    "Patient not ready",
+                    "Fear / second opinion",
+                    "Chose another hospital",
                     "Other"
                   ].map(reason => (
                     <label key={reason} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${lostReason === reason ? 'border-red-500 bg-red-50 text-red-700 font-bold' : 'border-slate-100 hover:border-slate-200'}`}>
@@ -413,7 +413,7 @@ export const PackageTeamDashboard: React.FC = () => {
                   <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-widest">Additional Notes / Reason Details *</label>
                   <textarea 
                     className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-medium outline-none focus:ring-4 focus:ring-red-50"
-                    placeholder="Enter specific details about why the patient declined..."
+                    placeholder="Enter the reason for surgery loss..."
                     rows={3}
                     value={lostOtherNote}
                     onChange={e => setLostOtherNote(e.target.value)}
