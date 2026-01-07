@@ -1,14 +1,14 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, Role, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
+import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
 import { 
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
   Download, ChevronRight, Stethoscope, User, Activity, 
   ShieldCheck, Phone, MapPin, AlertCircle, TrendingUp,
   DollarSign, Clock, XCircle, Info, CheckCircle2,
-  Globe, Briefcase as OccupationIcon
+  Globe
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -286,25 +286,25 @@ export const PackageTeamDashboard: React.FC = () => {
                     <div className="grid grid-cols-4 gap-4">
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                          <Globe className="w-3 h-3" /> Source
+                          <Globe className="w-3 h-3 text-slate-400" /> Source
                         </label>
                         <div className="text-xs font-black text-slate-800 truncate">{selectedPatient.source || 'N/A'}</div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                          <ShieldCheck className="w-3 h-3" /> Insurance
+                          <ShieldCheck className="w-3 h-3 text-slate-400" /> Insurance
                         </label>
                         <div className="text-xs font-black text-slate-800">{selectedPatient.hasInsurance || 'N/A'}</div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                          <OccupationIcon className="w-3 h-3" /> Occupation
+                          <Briefcase className="w-3 h-3 text-slate-400" /> Occupation
                         </label>
                         <div className="text-xs font-black text-slate-800 truncate">{selectedPatient.occupation || 'N/A'}</div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                          <Phone className="w-3 h-3" /> Mobile
+                          <Phone className="w-3 h-3 text-slate-400" /> Mobile
                         </label>
                         <div className="text-xs font-black text-slate-800">{selectedPatient.mobile || 'N/A'}</div>
                       </div>
