@@ -62,7 +62,6 @@ export const FrontOfficeDashboard: React.FC = () => {
           try {
             const dateObj = new Date(p.created_at);
             if (!isNaN(dateObj.getTime())) {
-              // Standardize to 24h HH:mm format
               timeDisplay = dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             }
           } catch (e) { console.warn("Time parse error", e); }
@@ -128,10 +127,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     clearError();
 
-    // Registry ID is optional - generate unique fallback if left blank
     const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
-    // Check for duplicate File ID only if we are creating NEW and ID was provided
     if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
@@ -145,7 +142,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          // Allow updating the actual Primary Key 'id'
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         }
       } else {
@@ -165,12 +161,15 @@ export const FrontOfficeDashboard: React.FC = () => {
   const handleRevisitSubmit = async () => {
     if (!revisitPatient) return;
     setIsSubmitting(true);
+    setLocalError(null);
     try {
       const timestamp = `${revisitData.date} ${revisitData.time}`;
+      // When a patient revisits, we clear their doctor assessment to put them back in the clinical queue
       await updatePatient({
         ...revisitPatient,
         isFollowUpVisit: true,
-        lastFollowUpVisitDate: timestamp
+        lastFollowUpVisitDate: timestamp,
+        doctorAssessment: undefined // Put back in queue
       });
       setRevisitPatient(null);
       setActiveTab('HISTORY');
@@ -421,7 +420,13 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
                           <button 
-                            onClick={() => setRevisitPatient(p)} 
+                            onClick={() => {
+                              setRevisitPatient(p);
+                              setRevisitData({
+                                date: new Date().toISOString().split('T')[0],
+                                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                              });
+                            }} 
                             className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"
                           >
                             <History className="w-3.5 h-3.5" /> Log Revisit
@@ -437,6 +442,89 @@ export const FrontOfficeDashboard: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {/* Log Revisit Modal */}
+      {revisitPatient && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+             <div className="p-6 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white p-2 rounded-xl shadow-sm border border-amber-200">
+                    <History className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-amber-900 leading-tight">Return Visit Log</h3>
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Re-registering for current OPD</p>
+                  </div>
+                </div>
+                <button onClick={() => setRevisitPatient(null)} className="p-2 hover:bg-amber-100 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-amber-400" />
+                </button>
+             </div>
+             
+             <div className="p-8 space-y-6">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
+                   <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-hospital-600">
+                     <User className="w-6 h-6" />
+                   </div>
+                   <div>
+                     <div className="text-sm font-bold text-slate-800">{revisitPatient.name}</div>
+                     <div className="text-[10px] font-mono font-bold text-slate-400">ID: {revisitPatient.id} • {revisitPatient.condition}</div>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3" /> Revisit Date
+                    </label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-all"
+                      value={revisitData.date}
+                      onChange={e => setRevisitData({...revisitData, date: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" /> Arrival Time
+                    </label>
+                    <input 
+                      type="time" 
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-amber-400 focus:bg-white transition-all"
+                      value={revisitData.time}
+                      onChange={e => setRevisitData({...revisitData, time: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                {localError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-red-600 text-[10px] font-bold">
+                    <AlertCircle className="w-4 h-4" />
+                    {localError}
+                  </div>
+                )}
+             </div>
+
+             <div className="p-6 bg-slate-50 border-t flex gap-4">
+                <button 
+                  onClick={() => setRevisitPatient(null)}
+                  className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleRevisitSubmit}
+                  disabled={isSubmitting}
+                  className="flex-[2] bg-amber-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-100 hover:bg-amber-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Confirm Revisit
+                </button>
+             </div>
+           </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
