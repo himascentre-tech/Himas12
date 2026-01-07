@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
@@ -7,7 +7,7 @@ import {
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
   Download, ChevronRight, Stethoscope, User, Activity, 
   ShieldCheck, Phone, MapPin, AlertCircle, TrendingUp,
-  DollarSign, Clock, XCircle
+  DollarSign, Clock, XCircle, Info, CheckCircle2
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -21,6 +21,13 @@ export const PackageTeamDashboard: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   
   const [aiLoading, setAiLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // States for Lost Reason Modal
+  const [showLostModal, setShowLostModal] = useState(false);
+  const [lostReason, setLostReason] = useState('');
+  const [lostOtherNote, setLostOtherNote] = useState('');
+
   const [proposal, setProposal] = useState<Partial<PackageProposal>>({
     decisionPattern: 'Standard',
     objectionIdentified: '',
@@ -30,6 +37,11 @@ export const PackageTeamDashboard: React.FC = () => {
   });
 
   const today = new Date().toISOString().split('T')[0];
+
+  // Helper for IST time
+  const getISTTimestamp = () => {
+    return new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  };
 
   const getProcedureDisplay = (p: Patient) => {
     const assessment = p.doctorAssessment;
@@ -77,25 +89,9 @@ export const PackageTeamDashboard: React.FC = () => {
     });
   }, [patients, counselingFilter, today, startDate, endDate]);
 
-  const handleDownloadCSV = () => {
-    if (filteredPatients.length === 0) return;
-    const headers = ['File ID', 'Name', 'Condition', 'DOP', 'Age', 'Mobile', 'Status', 'Procedure', 'Outcome Date'];
-    const rows = filteredPatients.map(p => [
-      p.id, p.name, p.condition, p.entry_date, p.age, p.mobile,
-      p.packageProposal?.status || 'Pending',
-      getProcedureDisplay(p),
-      p.packageProposal?.outcomeDate || 'N/A'
-    ].map(cell => `"${cell}"`).join(','));
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `HIMAS_${counselingFilter}_List.csv`;
-    link.click();
-  };
-
   const handlePatientSelect = (p: Patient) => {
     setSelectedPatient(p);
+    setValidationError(null);
     setProposal(p.packageProposal || {
       decisionPattern: 'Standard',
       objectionIdentified: '',
@@ -105,25 +101,83 @@ export const PackageTeamDashboard: React.FC = () => {
     });
   };
 
+  const validateAction = (status: ProposalStatus) => {
+    setValidationError(null);
+    
+    if (status === ProposalStatus.FollowUp) {
+      if (!proposal.followUpDate) {
+        setValidationError("Please select a follow-up date");
+        return false;
+      }
+    }
+
+    if (status === ProposalStatus.SurgeryFixed) {
+      if (!proposal.outcomeDate) {
+        setValidationError("Please select a valid Surgery Date before fixing");
+        return false;
+      }
+      if (proposal.outcomeDate < today) {
+        setValidationError("Surgery date cannot be in the past");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleAction = async (newStatus: ProposalStatus) => {
+    if (!selectedPatient) return;
+    
+    if (newStatus === ProposalStatus.SurgeryLost) {
+      setShowLostModal(true);
+      return;
+    }
+
+    if (!validateAction(newStatus)) return;
+
+    const istTime = getISTTimestamp();
+    const isClosing = newStatus === ProposalStatus.SurgeryFixed;
+    
+    await updatePackageProposal(selectedPatient.id, {
+      ...proposal as PackageProposal,
+      status: newStatus,
+      proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
+      lastFollowUpAt: istTime,
+      outcomeDate: isClosing ? proposal.outcomeDate : (proposal.outcomeDate || today)
+    });
+    
+    setSelectedPatient(null);
+  };
+
+  const handleConfirmLost = async () => {
+    if (!lostReason || (lostReason === 'Other' && !lostOtherNote.trim())) {
+      return;
+    }
+
+    const istTime = getISTTimestamp();
+    const finalReason = lostReason === 'Other' ? `Other: ${lostOtherNote}` : lostReason;
+    
+    await updatePackageProposal(selectedPatient!.id, {
+      ...proposal as PackageProposal,
+      status: ProposalStatus.SurgeryLost,
+      objectionIdentified: finalReason,
+      proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
+      outcomeDate: istTime,
+      lastFollowUpAt: istTime
+    });
+
+    setShowLostModal(false);
+    setLostReason('');
+    setLostOtherNote('');
+    setSelectedPatient(null);
+  };
+
   const handleGenerateAIStrategy = async () => {
     if (!selectedPatient) return;
     setAiLoading(true);
     const strategy = await generateCounselingStrategy(selectedPatient);
     setProposal(prev => ({ ...prev, counselingStrategy: strategy }));
     setAiLoading(false);
-  };
-
-  const updateStatusAndSave = (newStatus: ProposalStatus) => {
-    if (selectedPatient) {
-      const isClosing = newStatus === ProposalStatus.SurgeryFixed || newStatus === ProposalStatus.SurgeryLost;
-      updatePackageProposal(selectedPatient.id, {
-        ...proposal as PackageProposal,
-        status: newStatus,
-        proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
-        outcomeDate: isClosing ? today : proposal.outcomeDate
-      });
-      setSelectedPatient(null);
-    }
   };
 
   return (
@@ -145,53 +199,57 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-x-auto">
-                <button onClick={() => setCounselingFilter('PENDING')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
-                  <Clock className="w-4 h-4" /> New Candidates
-                </button>
-                <button onClick={() => setCounselingFilter('DUE_FOLLOWUPS')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}>
-                  <Calendar className="w-4 h-4" /> Due Follow-ups
-                </button>
-                <button onClick={() => setCounselingFilter('CONVERTED')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'CONVERTED' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
-                  <Trophy className="w-4 h-4" /> Surgery Fixed
-                </button>
-                <button onClick={() => setCounselingFilter('LOST_LIST')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'LOST_LIST' ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
-                  <XCircle className="w-4 h-4" /> Surgery Lost List
-                </button>
-              </div>
-
-              <button onClick={handleDownloadCSV} disabled={filteredPatients.length === 0} className="flex items-center gap-2 px-4 py-2.5 bg-hospital-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-hospital-100 hover:bg-hospital-700 transition-all active:scale-95 disabled:opacity-50">
-                <Download className="w-4 h-4" /> Download List ({filteredPatients.length})
+          {/* Filters Bar */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-x-auto">
+              <button onClick={() => setCounselingFilter('PENDING')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
+                <Clock className="w-4 h-4" /> New Candidates
               </button>
+              <button onClick={() => setCounselingFilter('DUE_FOLLOWUPS')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}>
+                <Calendar className="w-4 h-4" /> Due Follow-ups
+              </button>
+              <button onClick={() => setCounselingFilter('CONVERTED')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'CONVERTED' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
+                <Trophy className="w-4 h-4" /> Surgery Fixed
+              </button>
+              <button onClick={() => setCounselingFilter('LOST_LIST')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'LOST_LIST' ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
+                <XCircle className="w-4 h-4" /> Surgery Lost List
+              </button>
+            </div>
+            
+            <div className="flex gap-3">
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs p-2 border rounded-xl" placeholder="From" />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs p-2 border rounded-xl" placeholder="To" />
             </div>
           </div>
 
           <div className="flex h-[calc(100vh-280px)] gap-6">
+            {/* Sidebar Queue */}
             <div className="w-1/3 bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
               <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <span>Active Candidates</span>
-                <span className="bg-white border text-slate-600 px-2 py-0.5 rounded-full">{filteredPatients.length} Patients</span>
+                <span>Clinical Conversion List</span>
+                <span className="bg-white border text-slate-600 px-2 py-0.5 rounded-full">{filteredPatients.length}</span>
               </div>
               <div className="overflow-y-auto flex-1 p-3 space-y-3">
                 {filteredPatients.map(p => (
                   <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md ring-4 ring-hospital-50' : 'border-transparent bg-slate-50/50 hover:bg-slate-50'}`}>
                     <div className="flex justify-between items-start mb-2">
-                      <div className="font-bold text-slate-800 truncate">{p.name}</div>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter ${p.packageProposal?.status === ProposalStatus.SurgeryFixed ? 'bg-emerald-100 text-emerald-600' : p.packageProposal?.status === ProposalStatus.SurgeryLost ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>{p.packageProposal?.status || 'New'}</span>
+                      <div className="font-bold text-slate-800 truncate text-sm">{p.name}</div>
+                      <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter ${p.packageProposal?.status === ProposalStatus.SurgeryFixed ? 'bg-emerald-100 text-emerald-600' : p.packageProposal?.status === ProposalStatus.SurgeryLost ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                        {p.packageProposal?.status || 'New'}
+                      </span>
                     </div>
                     <div className="text-[10px] font-bold text-slate-400 flex flex-wrap gap-2">
                       <span className="text-hospital-600 uppercase">{p.condition}</span>
                       <span>•</span>
-                      <span>DOP: {p.entry_date}</span>
+                      <span>Age: {p.age}</span>
                     </div>
                   </div>
                 ))}
-                {filteredPatients.length === 0 && <div className="p-12 text-center text-slate-300 italic text-sm">No results found</div>}
+                {filteredPatients.length === 0 && <div className="p-12 text-center text-slate-300 italic text-sm">No records found for filter</div>}
               </div>
             </div>
 
+            {/* Assessment Panel */}
             <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
               {selectedPatient ? (
                 <div className="flex flex-col h-full">
@@ -206,124 +264,92 @@ export const PackageTeamDashboard: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block">Doctor Recommendation</span>
-                        <span className="bg-hospital-600 text-white px-3 py-1 rounded-lg text-[10px] font-black shadow-lg shadow-hospital-100">{selectedPatient.doctorAssessment?.quickCode}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-4 p-4 border-b bg-white">
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <MapPin className="w-3 h-3 text-slate-400" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Source</span>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 truncate">{selectedPatient.source}</div>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Insurance</span>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 truncate">{selectedPatient.hasInsurance}</div>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Briefcase className="w-3 h-3 text-blue-400" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Occupation</span>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 truncate">{selectedPatient.occupation || 'N/A'}</div>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Phone className="w-3 h-3 text-purple-400" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Mobile</span>
-                      </div>
-                      <div className="text-[11px] font-mono font-bold text-slate-700">{selectedPatient.mobile}</div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Recommendation</span>
+                      <span className="bg-hospital-600 text-white px-3 py-1 rounded-lg text-[10px] font-black">{selectedPatient.doctorAssessment?.quickCode}</span>
                     </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                    <div className="bg-slate-50/50 rounded-3xl border border-slate-200 p-6 flex items-center justify-between">
-                       <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" /> Initial Presentation (DOP)
-                          </label>
-                          <div className="text-lg font-black text-slate-800">{new Date(selectedPatient.entry_date).toLocaleDateString('en-IN', { dateStyle: 'long' })}</div>
-                       </div>
-                    </div>
-
+                    {/* Clinical Details Context */}
                     <div className="bg-hospital-50/30 rounded-3xl border border-hospital-100 p-6">
                       <div className="flex items-center gap-2 mb-4">
                         <Stethoscope className="w-4 h-4 text-hospital-600" />
-                        <h4 className="text-xs font-bold text-hospital-700 uppercase tracking-widest">Physician Assessment Detail</h4>
+                        <h4 className="text-xs font-bold text-hospital-700 uppercase tracking-widest">Surgeon's Insight</h4>
                       </div>
                       <div className="grid grid-cols-3 gap-6">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase">Procedure Recommendation</label>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase">Procedure</label>
                           <div className="text-sm font-bold text-slate-800">{getProcedureDisplay(selectedPatient)}</div>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Pain Severity</label>
-                          <div className={`text-sm font-bold flex items-center gap-1.5 ${selectedPatient.doctorAssessment?.painSeverity === 'High' ? 'text-red-600' : 'text-amber-600'}`}>
-                            <AlertCircle className="w-4 h-4" />
-                            {selectedPatient.doctorAssessment?.painSeverity}
-                          </div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase">Pain / Severity</label>
+                          <div className="text-sm font-bold text-amber-600 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {selectedPatient.doctorAssessment?.painSeverity}</div>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Affordability</label>
-                          <div className="text-sm font-bold text-emerald-600 flex items-center gap-1.5">
-                            <DollarSign className="w-4 h-4" />
-                            {selectedPatient.doctorAssessment?.affordability}
-                          </div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase">Financial Grade</label>
+                          <div className="text-sm font-bold text-emerald-600 flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> {selectedPatient.doctorAssessment?.affordability}</div>
                         </div>
                       </div>
                     </div>
 
+                    {/* Action Selection Forms */}
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 gap-6">
                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Decision Pattern</label>
-                            <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white outline-none focus:ring-4 focus:ring-hospital-50 transition-all" value={proposal.decisionPattern} onChange={e => setProposal({...proposal, decisionPattern: e.target.value})}>
-                              <option>Standard</option><option>Quick Decider</option><option>Price Sensitive</option><option>Needs Consult</option>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Decision Profile</label>
+                            <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" value={proposal.decisionPattern} onChange={e => setProposal({...proposal, decisionPattern: e.target.value})}>
+                              <option>Standard</option><option>Price Sensitive</option><option>Needs Consult</option><option>Quick Conversion</option>
                             </select>
                          </div>
                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Objection</label>
-                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white outline-none focus:ring-4 focus:ring-hospital-50" placeholder="e.g. Cost, Fear..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Objection</label>
+                            <input type="text" className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 bg-white" placeholder="e.g. Budget, Timing..." value={proposal.objectionIdentified} onChange={e => setProposal({...proposal, objectionIdentified: e.target.value})} />
                          </div>
                       </div>
 
                       <div className="space-y-3">
                          <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Counseling Strategy</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Counseling Approach</label>
                             <button onClick={handleGenerateAIStrategy} disabled={aiLoading} className="text-[9px] font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50">
-                              {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI STRATEGY
+                              {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI ASSIST
                             </button>
                          </div>
-                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[100px] focus:ring-4 focus:ring-hospital-50 italic leading-relaxed" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Draft the patient counseling approach..." />
+                         <textarea className="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 bg-slate-50/20 outline-none min-h-[100px] italic" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="Outline the strategy used for this patient..." />
                       </div>
 
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Next Follow-up Date</label>
-                         <div className="relative w-64">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                            <input type="date" min={today} className="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl font-bold text-slate-700 bg-white outline-none focus:ring-4 focus:ring-hospital-50" value={proposal.followUpDate} onChange={e => setProposal({...proposal, followUpDate: e.target.value})} />
-                         </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                             <Calendar className="w-3 h-3" /> Next Follow-up Date *
+                           </label>
+                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-slate-700 ${validationError?.includes('follow-up') ? 'border-red-300 bg-red-50' : 'border-slate-100'}`} value={proposal.followUpDate} onChange={e => { setProposal({...proposal, followUpDate: e.target.value}); setValidationError(null); }} />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                             <CheckCircle2 className="w-3 h-3" /> Surgery Date (Fixed Only) *
+                           </label>
+                           <input type="date" min={today} className={`w-full p-3 border-2 rounded-xl font-bold text-emerald-700 ${validationError?.includes('Surgery Date') ? 'border-red-300 bg-red-50' : 'border-emerald-100'}`} value={proposal.outcomeDate || ''} onChange={e => { setProposal({...proposal, outcomeDate: e.target.value}); setValidationError(null); }} />
+                        </div>
                       </div>
                     </div>
+                    
+                    {validationError && (
+                      <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold animate-pulse">
+                        <AlertCircle className="w-5 h-5" />
+                        {validationError}
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-6 border-t bg-slate-50/50 flex flex-wrap gap-3">
-                     <button onClick={() => updateStatusAndSave(ProposalStatus.FollowUp)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                     <button onClick={() => handleAction(ProposalStatus.FollowUp)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
                        <History className="w-5 h-5" /> Schedule Follow-up
                      </button>
-                     <button onClick={() => updateStatusAndSave(ProposalStatus.SurgeryLost)} className="flex-1 py-4 border border-red-100 text-red-600 rounded-2xl font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                     <button onClick={() => handleAction(ProposalStatus.SurgeryLost)} className="flex-1 py-4 border border-red-100 text-red-600 rounded-2xl font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2 shadow-sm">
                        <XCircle className="w-5 h-5" /> Mark as Lost
                      </button>
-                     <button onClick={() => updateStatusAndSave(ProposalStatus.SurgeryFixed)} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2">
+                     <button onClick={() => handleAction(ProposalStatus.SurgeryFixed)} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2">
                        <Trophy className="w-6 h-6" /> SURGERY FIXED!
                      </button>
                   </div>
@@ -333,8 +359,8 @@ export const PackageTeamDashboard: React.FC = () => {
                   <div className="bg-white p-8 rounded-full border border-slate-100 shadow-sm mb-6">
                     <Briefcase className="w-20 h-20 text-hospital-400 opacity-20" />
                   </div>
-                  <p className="text-xl font-bold text-slate-400 tracking-tight">Pipeline Manager Ready</p>
-                  <p className="text-[10px] uppercase font-bold tracking-widest mt-2 text-slate-300 bg-white px-4 py-2 rounded-full border border-slate-100 shadow-sm">Select a candidate to view physician insights and begin counseling</p>
+                  <p className="text-xl font-bold text-slate-400 tracking-tight">Select Candidate to Continue</p>
+                  <p className="text-[10px] uppercase font-bold tracking-widest mt-2 text-slate-300">Detailed counselor dashboard will load here upon selection</p>
                 </div>
               )}
             </div>
@@ -344,7 +370,69 @@ export const PackageTeamDashboard: React.FC = () => {
         <div className="animate-in fade-in slide-in-from-right-4 duration-500 bg-white p-20 rounded-3xl border border-slate-100 shadow-sm text-center">
            <Users className="w-20 h-20 mx-auto text-purple-600 opacity-20 mb-6" />
            <p className="font-bold text-2xl text-slate-800">Staff Management Console</p>
-           <p className="text-sm text-slate-400 mt-2 font-medium">Internal directory and access management tools coming soon...</p>
+           <p className="text-sm text-slate-400 mt-2 font-medium">Coming soon...</p>
+        </div>
+      )}
+
+      {/* Mark as Lost Modal */}
+      {showLostModal && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-red-50 border-b border-red-100 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <XCircle className="w-6 h-6 text-red-600" />
+                <h3 className="text-lg font-bold text-red-900">Patient File Closing: LOST</h3>
+              </div>
+              <button onClick={() => setShowLostModal(false)} className="p-2 hover:bg-red-100 rounded-full"><X className="w-5 h-5 text-red-400" /></button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">Select Primary Reason for Loss *</label>
+                <div className="space-y-3">
+                  {[
+                    "Cost issue / High Package",
+                    "Patient not ready / Seeking medical management",
+                    "Fear of surgery / Second opinion needed",
+                    "Chose another hospital / Local clinic",
+                    "Other"
+                  ].map(reason => (
+                    <label key={reason} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${lostReason === reason ? 'border-red-500 bg-red-50 text-red-700 font-bold' : 'border-slate-100 hover:border-slate-200'}`}>
+                      <input type="radio" className="hidden" name="lostReason" value={reason} checked={lostReason === reason} onChange={() => setLostReason(reason)} />
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${lostReason === reason ? 'border-red-500' : 'border-slate-300'}`}>
+                        {lostReason === reason && <div className="w-2 h-2 rounded-full bg-red-500" />}
+                      </div>
+                      <span className="text-sm">{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {(lostReason === 'Other' || lostReason) && (
+                <div className="animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-widest">Additional Notes / Reason Details *</label>
+                  <textarea 
+                    className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-medium outline-none focus:ring-4 focus:ring-red-50"
+                    placeholder="Enter specific details about why the patient declined..."
+                    rows={3}
+                    value={lostOtherNote}
+                    onChange={e => setLostOtherNote(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 bg-slate-50 flex gap-4">
+              <button onClick={() => setShowLostModal(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-all">Cancel</button>
+              <button 
+                onClick={handleConfirmLost}
+                disabled={!lostReason || (lostReason === 'Other' && !lostOtherNote.trim())}
+                className="flex-[2] py-3 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition-all disabled:opacity-30"
+              >
+                Confirm Surgery Lost
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
