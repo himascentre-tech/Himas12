@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
@@ -62,7 +63,6 @@ export const DoctorDashboard: React.FC = () => {
       setAssessment({ 
         ...assessment, 
         quickCode: code,
-        // Reset these if switching to S1 so user has to pick
         surgeryProcedure: undefined,
         painSeverity: undefined,
         affordability: undefined,
@@ -92,7 +92,6 @@ export const DoctorDashboard: React.FC = () => {
 
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
-      {/* Sidebar Queue */}
       <div className="w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
            <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm">
@@ -137,11 +136,9 @@ export const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Assessment Area */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
         {selectedPatient ? (
           <>
-            {/* Header */}
             <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
@@ -163,7 +160,6 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Patient Context Summary Bar */}
             <div className="px-6 py-5 bg-white border-b grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
                 <div className="bg-blue-500 p-2 rounded-lg text-white"><User className="w-4 h-4" /></div>
@@ -312,7 +308,3 @@ export const DoctorDashboard: React.FC = () => {
     </div>
   );
 };
-
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-);

@@ -8,7 +8,7 @@ import {
   Download, ChevronRight, Stethoscope, User, Activity, 
   ShieldCheck, Phone, MapPin, AlertCircle, TrendingUp,
   DollarSign, Clock, XCircle, Info, CheckCircle2,
-  Globe
+  Globe, Loader2
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -282,7 +282,6 @@ export const PackageTeamDashboard: React.FC = () => {
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                    {/* Key Attributes Summary */}
                     <div className="grid grid-cols-4 gap-4">
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
@@ -407,7 +406,6 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Mark as Lost Modal */}
       {showLostModal && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -471,7 +469,3 @@ export const PackageTeamDashboard: React.FC = () => {
     </div>
   );
 };
-
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-);
