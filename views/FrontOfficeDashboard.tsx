@@ -25,14 +25,12 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [otherSourceDetail, setOtherSourceDetail] = useState('');
   
-  // History Filter State
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Revisit modal state
   const [revisitPatient, setRevisitPatient] = useState<Patient | null>(null);
   const [revisitData, setRevisitData] = useState({
     date: new Date().toISOString().split('T')[0],
-    time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   });
 
   const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -53,25 +51,33 @@ export const FrontOfficeDashboard: React.FC = () => {
     condition: Condition.Piles 
   });
 
-  // Date-wise OPD History Logic
   const historyOPDList = useMemo(() => {
     const filterDate = selectedHistoryDate;
-    
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
-      // Check for new registration on selected date
       if (p.entry_date === filterDate) {
+        let timeDisplay = '--:--';
+        if (p.created_at) {
+          try {
+            const dateObj = new Date(p.created_at);
+            if (!isNaN(dateObj.getTime())) {
+              // Standardize to 24h HH:mm format
+              timeDisplay = dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+          } catch (e) { console.warn("Time parse error", e); }
+        }
+
         list.push({ 
           patient: p, 
-          arrivalTime: p.created_at ? new Date(p.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:00',
+          arrivalTime: timeDisplay,
           type: 'NEW' 
         });
       }
       
-      // Check for revisit logged on selected date
       if (p.lastFollowUpVisitDate?.startsWith(filterDate)) {
-         const timePart = p.lastFollowUpVisitDate.split(' ')[1] || '09:00';
+         const parts = p.lastFollowUpVisitDate.split(' ');
+         const timePart = parts.length > 1 ? parts[1] : '--:--';
          list.push({
            patient: p,
            arrivalTime: timePart,
@@ -80,7 +86,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       }
     });
 
-    // Sort by arrival time newest first
     return list.sort((a, b) => b.arrivalTime.localeCompare(a.arrivalTime));
   }, [patients, selectedHistoryDate]);
 
@@ -103,14 +108,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please fill in Name, Mobile, and Age.");
       return;
     }
-
-    // Insurance validation
     if (formData.hasInsurance === 'Yes' && !formData.insuranceName?.trim()) {
       setLocalError("Please specify the Insurance Provider Name.");
       return;
     }
-
-    // Source specific validation
     if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName?.trim()) {
       setLocalError("Referral Doctor Name is required for Doctor Recommended source.");
       return;
@@ -119,7 +120,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please specify the source details.");
       return;
     }
-
     setStep(2);
   };
 
@@ -128,17 +128,16 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     clearError();
 
-    // The Registry ID is now non-mandatory, but we need something for the DB if it's the primary key.
-    // If the user left it blank, we will auto-generate one based on time to satisfy unique constraints.
+    // Registry ID is optional - generate unique fallback if left blank
     const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
+    // Check for duplicate File ID only if we are creating NEW and ID was provided
     if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
     }
 
     setIsSubmitting(true);
-    
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
       const submissionData = { ...formData, source: finalSource, id: finalId };
@@ -146,7 +145,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          // Use editingId as oldId to allow renaming the primary key 'id'
+          // Allow updating the actual Primary Key 'id'
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         }
       } else {
@@ -175,7 +174,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       });
       setRevisitPatient(null);
       setActiveTab('HISTORY');
-      setSelectedHistoryDate(revisitData.date); // Switch to the date just logged
+      setSelectedHistoryDate(revisitData.date);
     } catch (err: any) {
       setLocalError("Revisit update failed: " + err.message);
     } finally {
@@ -221,13 +220,10 @@ export const FrontOfficeDashboard: React.FC = () => {
     "Saw Hospital Board Outside", "Other"
   ];
 
-  // Enhanced Filter Logic: Name, Mobile, or File ID
   const filteredArchive = useMemo(() => {
     if (!searchTerm.trim()) return patients;
-    
     const searchLower = searchTerm.toLowerCase();
-    const cleanSearchDigits = searchTerm.replace(/\D/g, ''); // Extract only digits for phone search
-    
+    const cleanSearchDigits = searchTerm.replace(/\D/g, '');
     return patients.filter(p => 
       p.name.toLowerCase().includes(searchLower) || 
       p.id.toLowerCase().includes(searchLower) ||
@@ -435,13 +431,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {filteredArchive.length === 0 && (
-                     <tr>
-                       <td colSpan={5} className="p-20 text-center">
-                         <p className="text-slate-400 font-bold italic">No records found matching "{searchTerm}"</p>
-                       </td>
-                     </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -449,44 +438,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       ) : null}
 
-      {/* Revisit Modal */}
-      {revisitPatient && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-             <div className="p-6 bg-slate-50 border-b flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-amber-100 p-2 rounded-xl"><History className="w-5 h-5 text-amber-600" /></div>
-                  <h3 className="font-bold text-slate-800">Log Revisit - {revisitPatient.name}</h3>
-                </div>
-                <button onClick={() => setRevisitPatient(null)}><X className="text-slate-400" /></button>
-             </div>
-             <div className="p-8 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Return Date</label>
-                    <input type="date" className="w-full bg-slate-50 border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 outline-none font-bold" value={revisitData.date} onChange={e => setRevisitData({...revisitData, date: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Arrival Time</label>
-                    <input type="time" className="w-full bg-slate-50 border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-amber-500 outline-none font-bold" value={revisitData.time} onChange={e => setRevisitData({...revisitData, time: e.target.value})} />
-                  </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
-                   <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                   <p className="text-[11px] text-amber-700 font-medium">This return visit will automatically push the patient back to the Clinical Queue for a fresh evaluation by the physician.</p>
-                </div>
-             </div>
-             <div className="p-6 bg-slate-50 border-t flex gap-3">
-                <button onClick={() => setRevisitPatient(null)} className="flex-1 py-3 text-slate-400 font-bold">Cancel</button>
-                <button onClick={handleRevisitSubmit} disabled={isSubmitting} className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-100">
-                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4" /> Finalize Revisit</>}
-                </button>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Registration Form Overlay */}
       {showForm && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-7xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -554,7 +505,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                           </button>
                         ))}
                       </div>
-
                       {formData.hasInsurance === 'Yes' && (
                         <div className="animate-in slide-in-from-top-2 duration-200 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 mt-4">
                           <label className="block text-xs font-bold text-emerald-600 uppercase mb-2 tracking-widest">Insurance Provider Name *</label>
@@ -589,26 +539,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         ))}
                       </div>
                     </div>
-
-                    {formData.source === 'Doctor Recommended' && (
-                      <div className="animate-in slide-in-from-top-2 duration-200 bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
-                        <label className="block text-xs font-bold text-blue-600 uppercase mb-2 tracking-widest">Referral Doctor Name *</label>
-                        <div className="relative">
-                           <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />
-                           <input required type="text" placeholder="Dr. First Last" className="w-full pl-12 pr-5 py-3.5 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-base text-slate-700" value={formData.sourceDoctorName} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.source === 'Other' && (
-                      <div className="animate-in slide-in-from-top-2 duration-200 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest">Specify Source Details *</label>
-                        <div className="relative">
-                           <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                           <input required type="text" placeholder="Specify source details..." className="w-full pl-12 pr-5 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-bold text-base text-slate-700" value={otherSourceDetail} onChange={e => setOtherSourceDetail(e.target.value)} />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : (

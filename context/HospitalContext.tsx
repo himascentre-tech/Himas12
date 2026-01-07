@@ -85,7 +85,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       ? JSON.parse(item.package_proposal) 
       : item.package_proposal;
 
-    // Merge top-level notes into the assessment if present in DB
     if (item.notes && doctorAssessment) {
       doctorAssessment.notes = item.notes;
     }
@@ -133,7 +132,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       package_proposal: p.packageProposal || null,
       is_follow_up: p.isFollowUpVisit || false,
       last_follow_up_visit_date: p.lastFollowUpVisitDate || null,
-      notes: p.doctorAssessment?.notes || null // Save notes to top-level column
+      notes: p.doctorAssessment?.notes || null
     };
   };
 
@@ -141,16 +140,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (cachedHospitalId.current) return cachedHospitalId.current;
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
       if (sessionError || !session?.user) return null;
-      
       const email = session.user.email || '';
       const demoEmails = ['office@himas.com', 'doctor@himas.com', 'team@himas.com'];
-      
       const id = demoEmails.includes(email.toLowerCase()) 
         ? SHARED_FACILITY_ID 
         : (session.user.user_metadata?.hospital_id || session.user.id);
-      
       cachedHospitalId.current = id;
       return id;
     } catch (e) {
@@ -222,13 +217,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
-        setPatients(prev => prev.map(p => p.id === targetId ? mapped : p));
+        if (oldId && oldId !== updatedPatient.id) {
+          setPatients(prev => prev.map(p => p.id === oldId ? mapped : p));
+        } else {
+          setPatients(prev => prev.map(p => p.id === targetId ? mapped : p));
+        }
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       
       setSaveStatus('saved');
     } catch (err: any) {
-      console.error("Detailed Update Error:", err);
       setLastErrorMessage(formatError(err));
       setSaveStatus('error');
       throw err;
@@ -244,12 +242,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
           const hospitalId = await getEffectiveHospitalId();
           if (!hospitalId) throw new Error("Not logged in.");
-
           const dbPayload = mapPatientToDB({ ...pd, hospital_id: hospitalId });
           const { data, error } = await supabase.from('himas_data').insert(dbPayload).select().single();
-          
           if (error) throw error;
-          
           const mapped = mapPatientFromDB(data);
           if (mapped) {
             setPatients(prev => [mapped, ...prev]);
