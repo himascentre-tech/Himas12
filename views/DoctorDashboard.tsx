@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
@@ -10,12 +9,12 @@ export const DoctorDashboard: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const [assessment, setAssessment] = useState<Partial<DoctorAssessment>>({
-    quickCode: SurgeonCode.S1,
-    surgeryProcedure: SurgeryProcedure.LapChole,
+    quickCode: undefined,
+    surgeryProcedure: undefined,
     otherSurgeryName: '',
-    painSeverity: PainSeverity.Moderate,
-    affordability: Affordability.A2,
-    conversionReadiness: ConversionReadiness.CR2,
+    painSeverity: undefined,
+    affordability: undefined,
+    conversionReadiness: undefined,
     tentativeSurgeryDate: '',
     doctorSignature: '',
     notes: ''
@@ -30,12 +29,12 @@ export const DoctorDashboard: React.FC = () => {
         });
       } else {
         setAssessment({
-          quickCode: SurgeonCode.S1,
-          surgeryProcedure: SurgeryProcedure.LapChole,
+          quickCode: undefined,
+          surgeryProcedure: undefined,
           otherSurgeryName: '',
-          painSeverity: PainSeverity.Moderate,
-          affordability: Affordability.A2,
-          conversionReadiness: ConversionReadiness.CR2,
+          painSeverity: undefined,
+          affordability: undefined,
+          conversionReadiness: undefined,
           tentativeSurgeryDate: '',
           doctorSignature: '',
           notes: ''
@@ -63,7 +62,11 @@ export const DoctorDashboard: React.FC = () => {
       setAssessment({ 
         ...assessment, 
         quickCode: code,
-        surgeryProcedure: assessment.surgeryProcedure || SurgeryProcedure.LapChole
+        // Reset these if switching to S1 so user has to pick
+        surgeryProcedure: undefined,
+        painSeverity: undefined,
+        affordability: undefined,
+        conversionReadiness: undefined
       });
     }
   };
@@ -209,7 +212,7 @@ export const DoctorDashboard: React.FC = () => {
                 </div>
               </section>
 
-              {!isMedicationOnly && (
+              {assessment.quickCode && !isMedicationOnly && (
                 <section className="animate-in fade-in slide-in-from-top-4 duration-300 space-y-8">
                   <div className="flex items-center gap-2 border-l-4 border-hospital-500 pl-4 py-1">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Surgical Assessment Detail</h3>
@@ -222,7 +225,7 @@ export const DoctorDashboard: React.FC = () => {
                         Surgery Procedure *
                       </label>
                       <select required className="w-full border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 bg-slate-50/50 outline-none" value={assessment.surgeryProcedure || ''} onChange={e => setAssessment({...assessment, surgeryProcedure: e.target.value as SurgeryProcedure})}>
-                        <option value="" disabled>Choose...</option>
+                        <option value="" disabled>Select Procedure...</option>
                         {Object.values(SurgeryProcedure).map(sp => <option key={sp} value={sp}>{sp}</option>)}
                       </select>
                     </div>
@@ -240,19 +243,21 @@ export const DoctorDashboard: React.FC = () => {
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">Pain Severity Profile</label>
                       <div className="flex gap-2">
                          {Object.values(PainSeverity).map(s => (
-                           <button key={s} type="button" onClick={() => setAssessment({...assessment, painSeverity: s})} className={`flex-1 py-3 text-[10px] font-bold rounded-xl border-2 transition-all ${assessment.painSeverity === s ? 'bg-hospital-600 border-hospital-600 text-white' : 'bg-white text-slate-400 border-slate-100'}`}>{s}</button>
+                           <button key={s} type="button" onClick={() => setAssessment({...assessment, painSeverity: s})} className={`flex-1 py-3 text-[10px] font-bold rounded-xl border-2 transition-all ${assessment.painSeverity === s ? 'bg-hospital-600 border-hospital-600 text-white shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>{s}</button>
                          ))}
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Financial Affordability</label>
-                      <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none" value={assessment.affordability} onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}>
+                      <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none" value={assessment.affordability || ''} onChange={e => setAssessment({...assessment, affordability: e.target.value as Affordability})}>
+                        <option value="" disabled>Select Affordability...</option>
                         {Object.values(Affordability).map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Patient Readiness</label>
-                      <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none" value={assessment.conversionReadiness} onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}>
+                      <select className="w-full border-2 border-slate-100 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none" value={assessment.conversionReadiness || ''} onChange={e => setAssessment({...assessment, conversionReadiness: e.target.value as ConversionReadiness})}>
+                        <option value="" disabled>Select Readiness...</option>
                         {Object.values(ConversionReadiness).map(cr => <option key={cr} value={cr}>{cr}</option>)}
                       </select>
                     </div>
@@ -281,13 +286,13 @@ export const DoctorDashboard: React.FC = () => {
               <section className="pt-8 border-t border-slate-100">
                 <div className="bg-slate-50 p-8 rounded-3xl border-2 border-slate-200 border-dashed relative">
                   <label className="absolute -top-3 left-6 bg-white px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-200 rounded-full">Attending Physician Validation</label>
-                  <input required type="text" placeholder="Type name to e-sign" className="w-full bg-transparent border-b-2 border-slate-300 py-3 text-3xl font-serif italic outline-none focus:border-hospital-600 transition-all placeholder:text-slate-200" value={assessment.doctorSignature} onChange={e => setAssessment({...assessment, doctorSignature: e.target.value})} />
+                  <input required type="text" placeholder="Type name to e-sign" className="w-full bg-transparent border-b-2 border-slate-300 py-3 text-3xl font-serif italic outline-none focus:border-hospital-600 transition-all placeholder:text-slate-200" value={assessment.doctorSignature || ''} onChange={e => setAssessment({...assessment, doctorSignature: e.target.value})} />
                 </div>
               </section>
 
               <div className="flex justify-end gap-4 pt-4">
                 <button type="button" onClick={() => setSelectedPatient(null)} className="px-8 py-3 text-slate-400 font-bold">Close</button>
-                <button type="submit" disabled={isSaving || !assessment.doctorSignature} className="px-12 py-4 bg-hospital-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95">
+                <button type="submit" disabled={isSaving || !assessment.doctorSignature} className="px-12 py-4 bg-hospital-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 disabled:opacity-50">
                   {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Stethoscope className="w-5 h-5" />}
                   Submit Evaluation
                 </button>
@@ -307,3 +312,7 @@ export const DoctorDashboard: React.FC = () => {
     </div>
   );
 };
+
+const Loader2 = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+);
