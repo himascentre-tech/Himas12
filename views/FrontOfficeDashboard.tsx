@@ -9,7 +9,7 @@ import {
   Phone, ChevronRight, AlertCircle, X,
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
-  Globe, UserPlus, ShieldCheck
+  Globe, UserPlus, ShieldCheck, Shield
 } from 'lucide-react';
 
 type TabType = 'NEW' | 'HISTORY' | 'OLD';
@@ -107,6 +107,21 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please fill in Name, Mobile, and Age.");
       return;
     }
+    
+    // Validate conditional fields
+    if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName?.trim()) {
+      setLocalError("Please enter the Doctor's Name.");
+      return;
+    }
+    if (formData.source === 'Other' && !otherSourceDetail.trim()) {
+      setLocalError("Please specify the lead source.");
+      return;
+    }
+    if (formData.hasInsurance === 'Yes' && !formData.insuranceName?.trim()) {
+      setLocalError("Please enter the Insurance Company Name.");
+      return;
+    }
+    
     setStep(2);
   };
 
@@ -152,15 +167,11 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     try {
       const timestamp = `${revisitData.date} ${revisitData.time}`;
-      
-      // LOGIC: To force the patient back to the Doctor's Queue, we:
-      // 1. Set isFollowUpVisit = true
-      // 2. Clear doctorAssessment (set to null)
       await updatePatient({
         ...revisitPatient,
         isFollowUpVisit: true,
         lastFollowUpVisitDate: timestamp,
-        doctorAssessment: null as any // Reset assessment to force back into Clinical Queue
+        doctorAssessment: null as any 
       });
       
       await refreshData();
@@ -207,9 +218,17 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const sources = [
-    "Google", "Facebook", "Instagram", "WhatsApp", "YouTube", 
-    "Website", "Doctor Recommended", "Old Patient / Friends / Relatives", 
-    "Saw Hospital Board Outside", "Other"
+    "Google", 
+    "Facebook", 
+    "Instagram", 
+    "WhatsApp", 
+    "YouTube", 
+    "Website", 
+    "Doctor Recommended", 
+    "Friend + Online",
+    "Old Patients / Relatives", 
+    "Saw Hospital Board Outside", 
+    "Other"
   ];
 
   const filteredArchive = useMemo(() => {
@@ -555,7 +574,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Primary Occupation</label>
                       <input type="text" placeholder="e.g. Professional" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 font-medium text-base" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
                     </div>
-                    <div>
+                    <div className="space-y-4">
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Insurance Cover</label>
                       <div className="flex gap-3">
                         {['Yes', 'No', 'Not Sure'].map(opt => (
@@ -564,6 +583,23 @@ export const FrontOfficeDashboard: React.FC = () => {
                           </button>
                         ))}
                       </div>
+
+                      {/* Conditional Insurance Name Field */}
+                      {formData.hasInsurance === 'Yes' && (
+                        <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                          <label className="block text-[10px] font-bold text-hospital-600 uppercase mb-2 tracking-widest flex items-center gap-2">
+                            <Shield className="w-3 h-3" /> Insurance Company Name *
+                          </label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="Insurance Co. Name..." 
+                            className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-4 py-3 font-bold text-hospital-700 text-sm focus:border-hospital-500 outline-none transition-all shadow-sm"
+                            value={formData.insuranceName || ''}
+                            onChange={e => setFormData({...formData, insuranceName: e.target.value})}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -575,16 +611,48 @@ export const FrontOfficeDashboard: React.FC = () => {
                         {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Lead Source *</label>
-                      <div className="grid grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-2">
+                    <div className="space-y-4">
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Lead Source *</label>
+                      <div className="grid grid-cols-2 gap-3 max-h-[180px] overflow-y-auto pr-2">
                         {sources.map(s => (
                           <label key={s} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${formData.source === s ? 'bg-hospital-50 border-hospital-200 text-hospital-700 font-bold' : 'bg-white border-slate-100 text-slate-400'}`}>
                             <input type="radio" className="hidden" name="source" value={s} checked={formData.source === s} onChange={() => setFormData({...formData, source: s})} />
-                            <span className="text-[11px] truncate tracking-tight">{s}</span>
+                            <span className="text-[10px] truncate tracking-tight">{s}</span>
                           </label>
                         ))}
                       </div>
+
+                      {/* Conditional Doctor's Name Field */}
+                      {formData.source === 'Doctor Recommended' && (
+                        <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                          <label className="block text-[10px] font-bold text-hospital-600 uppercase mb-2 tracking-widest flex items-center gap-2">
+                            <Stethoscope className="w-3 h-3" /> Attending Doctor Name *
+                          </label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="Dr. Name..." 
+                            className="w-full bg-hospital-50 border border-hospital-100 rounded-xl px-4 py-3 font-bold text-hospital-700 text-sm focus:border-hospital-500 outline-none transition-all shadow-sm"
+                            value={formData.sourceDoctorName || ''}
+                            onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})}
+                          />
+                        </div>
+                      )}
+
+                      {/* Conditional Other Source Field */}
+                      {formData.source === 'Other' && (
+                        <div className="animate-in fade-in slide-in-from-top-2 pt-2">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Specify Other Source *</label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="Please specify..." 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-700 text-sm focus:border-hospital-500 outline-none transition-all"
+                            value={otherSourceDetail}
+                            onChange={e => setOtherSourceDetail(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

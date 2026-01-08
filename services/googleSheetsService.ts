@@ -17,6 +17,9 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
     const currentStatus = patient.packageProposal?.status || "Pending Counseling";
     const outcomeDate = patient.packageProposal?.outcomeDate || "N/A";
 
+    // Determine Visit Type for clearer reporting on the sheet
+    const visitType = patient.isFollowUpVisit ? "Return Revisit" : "New Registration";
+
     const payload = {
       // Identity & Contact
       id: patient.id,
@@ -32,9 +35,15 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       source: patient.source,
       source_doctor_name: patient.sourceDoctorName || "N/A",
       
+      // Visit Tracking
+      visit_type: visitType,
+      is_follow_up: patient.isFollowUpVisit || false,
+      follow_up_visit_date: patient.lastFollowUpVisitDate || "N/A",
+      
       // Clinical Assessment
-      doctor_code: patient.doctorAssessment?.quickCode || "N/A",
-      surgery_procedure: surgeryProcedureValue,
+      // Note: If patient.doctorAssessment is null (revisit), these will show as "Awaiting Re-evaluation"
+      doctor_code: patient.doctorAssessment?.quickCode || (patient.isFollowUpVisit ? "Awaiting Re-evaluation" : "N/A"),
+      surgery_procedure: patient.doctorAssessment ? surgeryProcedureValue : (patient.isFollowUpVisit ? "Awaiting Re-evaluation" : "N/A"),
       pain_severity: patient.doctorAssessment?.painSeverity || "N/A",
       affordability: patient.doctorAssessment?.affordability || "N/A",
       readiness: patient.doctorAssessment?.conversionReadiness || "N/A",
@@ -48,14 +57,12 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       objection: patient.packageProposal?.objectionIdentified || "N/A",
       strategy: patient.packageProposal?.counselingStrategy || "N/A",
       
-      // Follow-up Tracking (Added for Google Sheet mapping)
-      follow_up_visit_date: patient.lastFollowUpVisitDate || "N/A",
+      // Follow-up Tracking
       next_follow_up_date: patient.packageProposal?.followUpDate || "N/A",
-      
       last_follow_up_at: patient.packageProposal?.lastFollowUpAt || "N/A",
       outcome_date: outcomeDate,
 
-      // Specific Outcome Columns for Google Sheet display
+      // Specific Outcome Columns
       surgery_date: currentStatus === ProposalStatus.SurgeryFixed ? outcomeDate : "N/A",
       surgery_fixed_date: currentStatus === ProposalStatus.SurgeryFixed ? outcomeDate : "N/A",
       surgery_lost_date: currentStatus === ProposalStatus.SurgeryLost ? outcomeDate : "N/A",
@@ -63,7 +70,7 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       last_updated: new Date().toISOString()
     };
 
-    console.log(`📊 Syncing [${patient.id}] to Sheets. Status: "${currentStatus}"`);
+    console.log(`📊 Syncing [${patient.id}] to Sheets. Visit: ${visitType}, Status: "${currentStatus}"`);
 
     await fetch(WEBHOOK_URL, {
       method: 'POST',
