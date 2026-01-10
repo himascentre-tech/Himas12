@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading, activeSubTab, setActiveSubTab } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
@@ -118,9 +119,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
 
           <nav className="space-y-2 flex-1">
-            <button className="w-full flex items-center gap-3 px-4 py-3 bg-hospital-600 text-white rounded-xl font-bold shadow-lg shadow-hospital-900/50 transition-all">
+            <button 
+              onClick={() => { setActiveSubTab('DASHBOARD'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeSubTab === 'DASHBOARD' ? 'bg-hospital-600 text-white shadow-lg shadow-hospital-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+            >
               <FileText className="w-5 h-5" /> Dashboard
             </button>
+            
+            {currentUserRole === 'FRONT_OFFICE' && (
+              <button 
+                onClick={() => { setActiveSubTab('BOOKING'); setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeSubTab === 'BOOKING' ? 'bg-hospital-600 text-white shadow-lg shadow-hospital-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+              >
+                <BookmarkPlus className="w-5 h-5" /> Scheduled Booking
+              </button>
+            )}
           </nav>
 
           <div className="pt-6 border-t border-slate-800">

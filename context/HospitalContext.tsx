@@ -1,12 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, BookingStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { syncToGoogleSheets } from '../services/googleSheetsService';
 
 interface HospitalContextType {
   currentUserRole: Role;
   setCurrentUserRole: (role: Role) => void;
+  activeSubTab: string;
+  setActiveSubTab: (tab: string) => void;
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'created_at' | 'hospital_id'>) => Promise<void>; 
   updatePatient: (patient: Patient, oldId?: string) => Promise<void>;
@@ -40,6 +42,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   });
 
+  const [activeSubTab, setActiveSubTab] = useState<string>('DASHBOARD');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +56,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const setCurrentUserRole = (role: Role) => {
     if (role) {
       sessionStorage.setItem(STORAGE_KEY_ROLE, role);
+      setActiveSubTab('DASHBOARD');
     } else {
       sessionStorage.removeItem(STORAGE_KEY_ROLE);
       cachedHospitalId.current = null;
@@ -104,7 +108,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       doctorAssessment: doctorAssessment || null,
       packageProposal: packageProposal || null,
       isFollowUpVisit: Boolean(item.is_follow_up),
-      lastFollowUpVisitDate: item.last_follow_up_visit_date || null
+      lastFollowUpVisitDate: item.last_follow_up_visit_date || null,
+      bookingStatus: item.booking_status as BookingStatus || null,
+      bookingTime: item.booking_time || null,
+      followUpControl: item.follow_up_control || null
     };
   };
 
@@ -128,7 +135,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       package_proposal: p.packageProposal === undefined || p.packageProposal === null ? null : p.packageProposal,
       is_follow_up: p.isFollowUpVisit === true,
       last_follow_up_visit_date: p.lastFollowUpVisitDate || null,
-      notes: p.doctorAssessment?.notes || null
+      notes: p.doctorAssessment?.notes || null,
+      booking_status: p.bookingStatus || null,
+      booking_time: p.bookingTime || null,
+      follow_up_control: p.followUpControl || null
     };
   };
 
@@ -230,7 +240,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   return (
     <HospitalContext.Provider value={{
-      currentUserRole, setCurrentUserRole, patients, updatePatient,
+      currentUserRole, setCurrentUserRole, activeSubTab, setActiveSubTab, patients, updatePatient,
       addPatient: async (pd) => {
         setSaveStatus('saving');
         clearError();

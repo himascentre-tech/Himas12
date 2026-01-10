@@ -63,6 +63,12 @@ export enum ProposalStatus {
   SurgeryLost = 'Surgery Lost',
 }
 
+export enum BookingStatus {
+  OPDFix = 'OPD Fix',
+  FollowUp = 'Follow-up',
+  Arrived = 'Arrived',
+}
+
 export interface DoctorAssessment {
   quickCode: SurgeonCode;
   surgeryProcedure?: SurgeryProcedure;
@@ -87,12 +93,20 @@ export interface PackageProposal {
   outcomeDate?: string; // Date when surgery was fixed or lost (YYYY-MM-DD)
 }
 
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  registeredAt: string;
+}
+
 export interface Patient {
   id: string; // File Registration Number
   hospital_id: string; // Multi-tenancy identifier
   name: string;
   dob?: string; 
-  entry_date: string; // Date of Presentation (DOP)
+  entry_date: string; // Date of Presentation (DOP) or Booking Date
   gender: Gender;
   age: number;
   mobile: string;
@@ -107,14 +121,8 @@ export interface Patient {
   packageProposal?: PackageProposal;
   isFollowUpVisit?: boolean; 
   lastFollowUpVisitDate?: string; 
-}
-
-export interface StaffUser {
-  id: string;
-  name: string;
-  email: string;
-  mobile: string;
-  role: Role;
-  registeredAt: string;
-  password?: string;
+  // New Booking Fields
+  bookingStatus?: BookingStatus;
+  bookingTime?: string;
+  followUpControl?: string;
 }

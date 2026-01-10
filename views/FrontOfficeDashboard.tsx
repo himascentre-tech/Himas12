@@ -2,22 +2,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
-import { Gender, Condition, Patient, ProposalStatus } from '../types';
+import { Gender, Condition, Patient, ProposalStatus, BookingStatus } from '../types';
 import { 
   PlusCircle, Search, CheckCircle, Clock, 
   Pencil, User, Loader2, Calendar, 
   Phone, ChevronRight, AlertCircle, X,
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
-  Globe, UserPlus, ShieldCheck, Shield
+  Globe, UserPlus, ShieldCheck, Shield, BookmarkPlus, CalendarCheck,
+  UserCheck
 } from 'lucide-react';
 
-type TabType = 'NEW' | 'HISTORY' | 'OLD';
+/**
+ * SQL FIX FOR SUPABASE AGE CONSTRAINT:
+ * If you encounter a "himas_data_age_check" violation, run this in your Supabase SQL Editor:
+ * 
+ * ALTER TABLE himas_data DROP CONSTRAINT IF EXISTS himas_data_age_check;
+ * ALTER TABLE himas_data ADD CONSTRAINT himas_data_age_check CHECK (age >= 0);
+ */
+
+type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, refreshData, lastErrorMessage, clearError } = useHospital();
+  const { patients, addPatient, updatePatient, refreshData, lastErrorMessage, clearError, activeSubTab, setActiveSubTab } = useHospital();
   const [activeTab, setActiveTab] = useState<TabType>('HISTORY');
   const [showForm, setShowForm] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,7 +45,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
-  const [formData, setFormData] = useState<Partial<Patient>>({
+  const getInitialFormData = (): Partial<Patient> => ({
     id: '', 
     name: '',
     dob: '',
@@ -51,11 +61,35 @@ export const FrontOfficeDashboard: React.FC = () => {
     condition: Condition.Piles 
   });
 
+  const [formData, setFormData] = useState<Partial<Patient>>(getInitialFormData());
+
+  const [bookingData, setBookingData] = useState<Partial<Patient>>({
+    name: '',
+    mobile: '',
+    source: 'Google',
+    entry_date: getTodayDate(),
+    bookingTime: '',
+    bookingStatus: BookingStatus.OPDFix,
+    condition: Condition.Piles,
+  });
+
+  // Sync sidebar state with dashboard tabs
+  useEffect(() => {
+    if (activeSubTab === 'BOOKING') {
+      setActiveTab('BOOKING');
+      setShowBookingForm(false); 
+    } else if (activeSubTab === 'DASHBOARD') {
+      setActiveTab('HISTORY');
+    }
+  }, [activeSubTab]);
+
   const historyOPDList = useMemo(() => {
     const filterDate = selectedHistoryDate;
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
+      if (p.bookingStatus) return; // Exclude bookings from history ledger
+
       if (p.entry_date === filterDate) {
         let timeDisplay = '--:--';
         if (p.created_at) {
@@ -87,6 +121,16 @@ export const FrontOfficeDashboard: React.FC = () => {
 
     return list.sort((a, b) => b.arrivalTime.localeCompare(a.arrivalTime));
   }, [patients, selectedHistoryDate]);
+
+  const bookingList = useMemo(() => {
+    return patients.filter(p => !!p.bookingStatus)
+      .filter(p => {
+        if (!searchTerm.trim()) return true;
+        const s = searchTerm.toLowerCase();
+        return p.name.toLowerCase().includes(s) || p.mobile.includes(s);
+      })
+      .sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+  }, [patients, searchTerm]);
 
   useEffect(() => {
     if (formData.dob) {
@@ -132,6 +176,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
     const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
+    // Check for ID conflicts, but exclude the current editing session if it's the same ID
     if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
@@ -140,12 +185,23 @@ export const FrontOfficeDashboard: React.FC = () => {
     setIsSubmitting(true);
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
-      const submissionData = { ...formData, source: finalSource, id: finalId };
+      
+      // Promoted patients have bookingStatus: null
+      const submissionData = { 
+        ...formData, 
+        source: finalSource, 
+        id: finalId,
+        bookingStatus: null 
+      };
 
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
+          // Pass original to preserve non-form fields (like medical history if any)
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
+        } else {
+          // If original record missing (unlikely), treat as new add
+          await addPatient(submissionData as any);
         }
       } else {
         await addPatient(submissionData as any);
@@ -158,6 +214,100 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError(err.message || "Submission failed.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    
+    if (!bookingData.name || !bookingData.mobile || !bookingData.source || !bookingData.entry_date || !bookingData.bookingTime) {
+      setLocalError("Patient Name, Phone, Source, Date, and Timing are mandatory.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const isExisting = !!bookingData.id;
+      if (isExisting) {
+        await updatePatient(bookingData as Patient);
+      } else {
+        const bookingId = `BOOK-${Date.now().toString().slice(-6)}`;
+        const submission = {
+          ...bookingData,
+          id: bookingId,
+          gender: Gender.Other,
+          age: 1, 
+          occupation: '',
+          hasInsurance: 'No' as any,
+          condition: bookingData.condition || Condition.Other,
+        };
+        await addPatient(submission as any);
+      }
+      setShowBookingForm(false);
+      setBookingData({
+        name: '',
+        mobile: '',
+        source: 'Google',
+        entry_date: getTodayDate(),
+        bookingTime: '',
+        bookingStatus: BookingStatus.OPDFix,
+        condition: Condition.Piles,
+      });
+      setActiveTab('BOOKING');
+      setActiveSubTab('BOOKING');
+    } catch (err: any) {
+      setLocalError(err.message || "Booking failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const cycleBookingStatus = async (patient: Patient) => {
+    let nextStatus: BookingStatus;
+    // Cycle only between OPD Fix and Follow-up. Arrived is a final action column.
+    if (patient.bookingStatus === BookingStatus.OPDFix) nextStatus = BookingStatus.FollowUp;
+    else nextStatus = BookingStatus.OPDFix;
+
+    try {
+      await updatePatient({ ...patient, bookingStatus: nextStatus });
+    } catch (err) {
+      console.error("Status update error", err);
+    }
+  };
+
+  const handleMarkArrivedAndRegister = async (patient: Patient) => {
+    try {
+      // 1. Update status to Arrived in the database first to reflect immediate presence
+      if (patient.bookingStatus !== BookingStatus.Arrived) {
+        await updatePatient({ ...patient, bookingStatus: BookingStatus.Arrived });
+      }
+
+      // 2. Pre-fill Registry form starting from a clean state to ensure everything is updated as per "Register New"
+      let baseSource = patient.source;
+      let detail = '';
+      if (patient.source && patient.source.startsWith('Other: ')) {
+        baseSource = 'Other';
+        detail = patient.source.replace('Other: ', '');
+      }
+
+      setFormData({
+        ...getInitialFormData(), // Start from defaults
+        name: patient.name,
+        mobile: patient.mobile,
+        source: baseSource,
+        entry_date: getTodayDate(), // Reset to today for arrival registration
+        condition: patient.condition,
+        // For actual File ID, we leave it blank so user fills it, but we keep track of which record we are promoting
+        id: '' 
+      });
+      
+      setEditingId(patient.id); // This is the BOOK-XXXX ID we will update/rename
+      setOtherSourceDetail(detail);
+      setStep(1);
+      setShowForm(true);
+    } catch (err) {
+      console.error("Arrived check-in failed", err);
     }
   };
 
@@ -186,10 +336,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const resetForm = () => {
-    setFormData({
-      id: '', name: '', dob: '', entry_date: getTodayDate(), gender: Gender.Male, age: 0, mobile: '', occupation: '',
-      hasInsurance: 'No', insuranceName: '', source: 'Google', sourceDoctorName: '', condition: Condition.Piles
-    });
+    setFormData(getInitialFormData());
     setOtherSourceDetail('');
     setEditingId(null);
     setStep(1);
@@ -232,10 +379,10 @@ export const FrontOfficeDashboard: React.FC = () => {
   ];
 
   const filteredArchive = useMemo(() => {
-    if (!searchTerm.trim()) return patients;
+    if (!searchTerm.trim()) return patients.filter(p => !p.bookingStatus);
     const searchLower = searchTerm.toLowerCase();
     const cleanSearchDigits = searchTerm.replace(/\D/g, '');
-    return patients.filter(p => 
+    return patients.filter(p => !p.bookingStatus).filter(p => 
       p.name.toLowerCase().includes(searchLower) || 
       p.id.toLowerCase().includes(searchLower) ||
       (cleanSearchDigits && p.mobile.includes(cleanSearchDigits))
@@ -251,22 +398,28 @@ export const FrontOfficeDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Front Office</h2>
           <p className="text-gray-500 text-sm">Registry Operations & Daily OPD</p>
         </div>
-        <div className="flex bg-white rounded-2xl p-1.5 border shadow-sm">
+        <div className="flex bg-white rounded-2xl p-1.5 border shadow-sm max-w-full overflow-x-auto no-scrollbar">
           <button 
-            onClick={() => { resetForm(); setShowForm(true); }} 
-            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all ${activeTab === 'NEW' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+            onClick={() => { resetForm(); setShowForm(true); setActiveSubTab('DASHBOARD'); }} 
+            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'NEW' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <PlusCircle className="w-4 h-4" /> Register New
           </button>
           <button 
-            onClick={() => { setActiveTab('HISTORY'); setSearchTerm(''); }} 
-            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all ${activeTab === 'HISTORY' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+            onClick={() => { setActiveTab('HISTORY'); setSearchTerm(''); setActiveSubTab('DASHBOARD'); }} 
+            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'HISTORY' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <Timer className="w-4 h-4" /> OPD History
           </button>
           <button 
-            onClick={() => { setActiveTab('OLD'); setSearchTerm(''); }} 
-            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all ${activeTab === 'OLD' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+            onClick={() => { setActiveTab('BOOKING'); setSearchTerm(''); setActiveSubTab('BOOKING'); }} 
+            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'BOOKING' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <CalendarCheck className="w-4 h-4" /> Scheduled Bookings
+          </button>
+          <button 
+            onClick={() => { setActiveTab('OLD'); setSearchTerm(''); setActiveSubTab('DASHBOARD'); }} 
+            className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'OLD' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <Search className="w-4 h-4" /> Archive Search
           </button>
@@ -362,6 +515,137 @@ export const FrontOfficeDashboard: React.FC = () => {
             </table>
           </div>
         </div>
+      ) : activeTab === 'BOOKING' ? (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input 
+                type="text" 
+                placeholder="Search bookings by name or phone..." 
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-medium text-slate-700"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={() => {
+                setBookingData({
+                  name: '',
+                  mobile: '',
+                  source: 'Google',
+                  entry_date: getTodayDate(),
+                  bookingTime: '',
+                  bookingStatus: BookingStatus.OPDFix,
+                  condition: Condition.Piles,
+                });
+                setShowBookingForm(true);
+              }} 
+              className="flex items-center gap-2 px-6 py-3 bg-hospital-600 text-white rounded-2xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all active:scale-95"
+            >
+              <BookmarkPlus className="w-5 h-5" /> Add New Booking
+            </button>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                <tr>
+                  <th className="px-6 py-4">Booking Status</th>
+                  <th className="px-6 py-4">Scheduled Date</th>
+                  <th className="px-6 py-4">Patient Profile</th>
+                  <th className="px-6 py-4">Condition</th>
+                  <th className="px-6 py-4">Lead Source</th>
+                  <th className="px-6 py-4 text-center">Check-In Action</th>
+                  <th className="px-6 py-4 text-center">Manage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {bookingList.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => cycleBookingStatus(booking)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-[10px] border transition-all active:scale-95 ${
+                          booking.bookingStatus === BookingStatus.OPDFix ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' :
+                          booking.bookingStatus === BookingStatus.FollowUp ? 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100' :
+                          'bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100'
+                        }`}
+                      >
+                        {booking.bookingStatus}
+                        <ArrowRight className="w-3 h-3 opacity-30" />
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-hospital-500" /> {booking.entry_date}
+                        </div>
+                        <div className="text-[10px] font-mono font-bold text-slate-400 mt-0.5 ml-5">
+                          {booking.bookingTime}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-900">{booking.name}</div>
+                      <div className="text-[10px] font-mono text-slate-400 font-bold">{booking.mobile}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] font-bold text-hospital-600 uppercase tracking-tighter bg-hospital-50 px-2 py-1 rounded-md">{booking.condition}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-slate-300" /> {booking.source}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button 
+                        onClick={() => handleMarkArrivedAndRegister(booking)}
+                        className={`flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border transition-all active:scale-95 ${
+                          booking.bookingStatus === BookingStatus.Arrived 
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-lg shadow-purple-100' 
+                          : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'
+                        }`}
+                      >
+                        <UserCheck className="w-4 h-4" /> Check-In Arrived
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {booking.bookingStatus !== BookingStatus.Arrived && (
+                           <button 
+                             onClick={() => {
+                               setBookingData(booking);
+                               setShowBookingForm(true);
+                             }}
+                             className="p-2 text-slate-300 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"
+                           >
+                             <Pencil className="w-4 h-4" />
+                           </button>
+                        )}
+                        <button 
+                          onClick={async () => {
+                             if (confirm(`Delete booking for ${booking.name}?`)) {
+                               await useHospital().deletePatient(booking.id);
+                             }
+                          }}
+                          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {bookingList.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 italic font-medium">No bookings found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : activeTab === 'OLD' ? (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-4">
           <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
@@ -443,6 +727,126 @@ export const FrontOfficeDashboard: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {/* Booking Form Modal */}
+      {showBookingForm && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+            <div className="p-8 bg-slate-50 border-b flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="bg-hospital-600 p-3 rounded-2xl shadow-lg">
+                  <BookmarkPlus className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Scheduled Patient Booking</h3>
+                  <p className="text-[10px] font-bold text-hospital-600 uppercase tracking-widest mt-0.5">Pre-Registration Appointment</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowBookingForm(false); setActiveSubTab('DASHBOARD'); setActiveTab('HISTORY'); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBookingSubmit} className="p-8 space-y-8">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Patient Name *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      placeholder="Enter Full Name"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.name}
+                      onChange={e => setBookingData({...bookingData, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Phone Number *</label>
+                    <input 
+                      required 
+                      type="tel" 
+                      placeholder="10-digit mobile"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.mobile}
+                      onChange={e => setBookingData({...bookingData, mobile: e.target.value.replace(/\D/g,'').slice(0,10)})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Lead Source *</label>
+                    <select 
+                      required
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.source}
+                      onChange={e => setBookingData({...bookingData, source: e.target.value})}
+                    >
+                      {sources.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Booking Date *</label>
+                    <input 
+                      required 
+                      type="date"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.entry_date}
+                      onChange={e => setBookingData({...bookingData, entry_date: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Preferred Timing *</label>
+                    <input 
+                      required 
+                      type="time"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.bookingTime}
+                      onChange={e => setBookingData({...bookingData, bookingTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Condition *</label>
+                    <select 
+                      required
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-base font-bold text-slate-700 outline-none focus:border-hospital-500 focus:bg-white transition-all shadow-sm"
+                      value={bookingData.condition}
+                      onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}
+                    >
+                      {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Booking Status</label>
+                    <select 
+                      className="w-full bg-hospital-50 border-2 border-hospital-100 rounded-xl p-4 text-base font-black text-hospital-700 outline-none focus:border-hospital-500"
+                      value={bookingData.bookingStatus}
+                      onChange={e => setBookingData({...bookingData, bookingStatus: e.target.value as BookingStatus})}
+                    >
+                      {Object.values(BookingStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+               </div>
+
+               {localError && (
+                <div className="p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl flex items-center gap-3 animate-pulse border border-red-100">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  {localError}
+                </div>
+              )}
+
+              <div className="pt-6 border-t flex gap-4">
+                 <button type="button" onClick={() => { setShowBookingForm(false); setActiveSubTab('DASHBOARD'); setActiveTab('HISTORY'); }} className="flex-1 py-4 text-slate-400 font-bold hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
+                 <button 
+                   type="submit" 
+                   disabled={isSubmitting}
+                   className="flex-[2] bg-hospital-700 text-white font-bold py-4 rounded-2xl shadow-xl shadow-hospital-100 hover:bg-hospital-800 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                 >
+                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CalendarCheck className="w-5 h-5" />}
+                   {bookingData.id ? 'Save Updates' : 'Confirm Booking'}
+                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {revisitPatient && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -532,7 +936,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <p className="text-sm text-slate-400 font-medium">Step {step} of 2</p>
                 </div>
               </div>
-              <button onClick={() => { setShowForm(false); setActiveTab('HISTORY'); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+              <button onClick={() => { setShowForm(false); setActiveTab('HISTORY'); setActiveSubTab('DASHBOARD'); }} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <X className="w-8 h-8 text-slate-400" />
               </button>
             </div>
