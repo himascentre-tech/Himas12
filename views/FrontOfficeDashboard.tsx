@@ -186,7 +186,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
       
-      // Promoted patients have bookingStatus: null
+      // Promoted patients have bookingStatus cleared
       const submissionData = { 
         ...formData, 
         source: finalSource, 
@@ -197,7 +197,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          // Pass original to preserve non-form fields (like medical history if any)
+          // Pass original to preserve non-form fields
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         } else {
           // If original record missing (unlikely), treat as new add
@@ -265,7 +265,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const cycleBookingStatus = async (patient: Patient) => {
     let nextStatus: BookingStatus;
-    // Cycle only between OPD Fix and Follow-up. Arrived is a final action column.
+    // Cycle between OPD Fix and Follow-up
     if (patient.bookingStatus === BookingStatus.OPDFix) nextStatus = BookingStatus.FollowUp;
     else nextStatus = BookingStatus.OPDFix;
 
@@ -278,12 +278,12 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleMarkArrivedAndRegister = async (patient: Patient) => {
     try {
-      // 1. Update status to Arrived in the database first to reflect immediate presence
+      // 1. Update status to Arrived in the database first
       if (patient.bookingStatus !== BookingStatus.Arrived) {
         await updatePatient({ ...patient, bookingStatus: BookingStatus.Arrived });
       }
 
-      // 2. Pre-fill Registry form starting from a clean state to ensure everything is updated as per "Register New"
+      // 2. Pre-fill Registry form starting from a clean state
       let baseSource = patient.source;
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
@@ -292,17 +292,16 @@ export const FrontOfficeDashboard: React.FC = () => {
       }
 
       setFormData({
-        ...getInitialFormData(), // Start from defaults
+        ...getInitialFormData(),
         name: patient.name,
         mobile: patient.mobile,
         source: baseSource,
-        entry_date: getTodayDate(), // Reset to today for arrival registration
+        entry_date: getTodayDate(), 
         condition: patient.condition,
-        // For actual File ID, we leave it blank so user fills it, but we keep track of which record we are promoting
         id: '' 
       });
       
-      setEditingId(patient.id); // This is the BOOK-XXXX ID we will update/rename
+      setEditingId(patient.id); // Promoting this BOOK-XXXX ID
       setOtherSourceDetail(detail);
       setStep(1);
       setShowForm(true);

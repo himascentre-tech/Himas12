@@ -105,24 +105,24 @@ export interface Patient {
   id: string; // File Registration Number
   hospital_id: string; // Multi-tenancy identifier
   name: string;
-  dob?: string; 
+  dob?: string | null; 
   entry_date: string; // Date of Presentation (DOP) or Booking Date
   gender: Gender;
   age: number;
   mobile: string;
   occupation: string;
   hasInsurance: 'Yes' | 'No' | 'Not Sure';
-  insuranceName?: string; 
+  insuranceName?: string | null; 
   source: string; 
-  sourceDoctorName?: string;
+  sourceDoctorName?: string | null;
   condition: Condition;
   created_at: string; 
-  doctorAssessment?: DoctorAssessment;
-  packageProposal?: PackageProposal;
+  doctorAssessment?: DoctorAssessment | null;
+  packageProposal?: PackageProposal | null;
   isFollowUpVisit?: boolean; 
-  lastFollowUpVisitDate?: string; 
+  lastFollowUpVisitDate?: string | null; 
   // New Booking Fields
-  bookingStatus?: BookingStatus;
-  bookingTime?: string;
-  followUpControl?: string;
+  bookingStatus?: BookingStatus | null;
+  bookingTime?: string | null;
+  followUpControl?: string | null;
 }
