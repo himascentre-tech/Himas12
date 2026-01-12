@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -24,7 +23,7 @@ import {
 type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, refreshData, lastErrorMessage, clearError, activeSubTab, setActiveSubTab } = useHospital();
+  const { patients, addPatient, updatePatient, deletePatient, refreshData, lastErrorMessage, clearError, activeSubTab, setActiveSubTab } = useHospital();
   const [activeTab, setActiveTab] = useState<TabType>('HISTORY');
   const [showForm, setShowForm] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -625,7 +624,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                         <button 
                           onClick={async () => {
                              if (confirm(`Delete booking for ${booking.name}?`)) {
-                               await useHospital().deletePatient(booking.id);
+                               await deletePatient(booking.id);
                              }
                           }}
                           className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
