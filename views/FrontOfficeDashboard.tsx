@@ -9,7 +9,7 @@ import {
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
   Globe, UserPlus, ShieldCheck, Shield, BookmarkPlus, CalendarCheck,
-  UserCheck
+  UserCheck, RotateCcw
 } from 'lucide-react';
 
 /**
@@ -28,6 +28,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBookingDate, setSelectedBookingDate] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -124,12 +125,16 @@ export const FrontOfficeDashboard: React.FC = () => {
   const bookingList = useMemo(() => {
     return patients.filter(p => !!p.bookingStatus)
       .filter(p => {
-        if (!searchTerm.trim()) return true;
-        const s = searchTerm.toLowerCase();
-        return p.name.toLowerCase().includes(s) || p.mobile.includes(s);
+        const matchesSearch = !searchTerm.trim() || 
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          p.mobile.includes(searchTerm);
+        
+        const matchesDate = !selectedBookingDate || p.entry_date === selectedBookingDate;
+        
+        return matchesSearch && matchesDate;
       })
       .sort((a, b) => b.entry_date.localeCompare(a.entry_date));
-  }, [patients, searchTerm]);
+  }, [patients, searchTerm, selectedBookingDate]);
 
   useEffect(() => {
     if (formData.dob) {
@@ -410,7 +415,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             <Timer className="w-4 h-4" /> OPD History
           </button>
           <button 
-            onClick={() => { setActiveTab('BOOKING'); setSearchTerm(''); setActiveSubTab('BOOKING'); }} 
+            onClick={() => { setActiveTab('BOOKING'); setSearchTerm(''); setSelectedBookingDate(''); setActiveSubTab('BOOKING'); }} 
             className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'BOOKING' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <CalendarCheck className="w-4 h-4" /> Scheduled Bookings
@@ -486,7 +491,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2 py-1 rounded-lg border border-hospital-100">{entry.patient.id}</span>
+                      <span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2.5 py-1.5 rounded-lg border border-hospital-100">{entry.patient.id}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-slate-900 group-hover:text-hospital-700 transition-colors">{entry.patient.name}</div>
@@ -515,16 +520,36 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       ) : activeTab === 'BOOKING' ? (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input 
-                type="text" 
-                placeholder="Search bookings by name or phone..." 
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-medium text-slate-700"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+          <div className="flex flex-col xl:flex-row gap-4 justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <div className="flex flex-col md:flex-row gap-4 w-full xl:w-3/4">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input 
+                  type="text" 
+                  placeholder="Search bookings by name or phone..." 
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-medium text-slate-700"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="relative w-full md:w-64">
+                <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-hospital-500 w-5 h-5" />
+                <input 
+                  type="date" 
+                  className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-bold text-slate-700 appearance-none bg-white"
+                  value={selectedBookingDate}
+                  onChange={e => setSelectedBookingDate(e.target.value)}
+                />
+                {selectedBookingDate && (
+                  <button 
+                    onClick={() => setSelectedBookingDate('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
+                    title="Clear Date"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <button 
               onClick={() => {
@@ -539,7 +564,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 });
                 setShowBookingForm(true);
               }} 
-              className="flex items-center gap-2 px-6 py-3 bg-hospital-600 text-white rounded-2xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all active:scale-95"
+              className="flex items-center gap-2 px-6 py-3 bg-hospital-600 text-white rounded-2xl font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all active:scale-95 whitespace-nowrap"
             >
               <BookmarkPlus className="w-5 h-5" /> Add New Booking
             </button>
@@ -637,7 +662,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 ))}
                 {bookingList.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 italic font-medium">No bookings found</td>
+                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 italic font-medium">No bookings found {selectedBookingDate ? `for ${selectedBookingDate}` : ''}</td>
                   </tr>
                 )}
               </tbody>
