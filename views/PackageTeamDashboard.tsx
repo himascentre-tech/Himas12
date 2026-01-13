@@ -305,6 +305,32 @@ export const PackageTeamDashboard: React.FC = () => {
   // Narrow selectedPatient for internal rendering blocks to satisfy TS
   const currentPatient = selectedPatient;
 
+  // Computed rows for printable table
+  const printableRows = useMemo(() => {
+    if (!currentPatient) return [];
+    
+    const rows = [
+      { label: 'PATIENT NAME', value: (currentPatient.name || 'N/A').toUpperCase() },
+      { label: 'AGE / SEX', value: `${currentPatient.age || 0} / ${currentPatient.gender || 'N/A'}` },
+      { label: 'UHID NO', value: currentPatient.id || 'N/A', isMono: true },
+      { label: 'CONTACT NO', value: currentPatient.mobile || 'N/A', isMono: true },
+      { label: 'REFERRED BY', value: (currentPatient.sourceDoctorName || currentPatient.source || 'N/A').toUpperCase() },
+      { label: 'No of Days of Admission', value: `${proposal.stayDays || '____'} Days` },
+      { label: 'PROPOSED SURGERY', value: (
+          (currentPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
+            ? currentPatient.doctorAssessment?.otherSurgeryName 
+            : currentPatient.doctorAssessment?.surgeryProcedure) || '________________'
+        ).toUpperCase() },
+      { label: 'MODE OF PAYMENT', value: proposal.paymentMode?.includes('Insurance') ? `INSURANCE (${(currentPatient.insuranceName || 'Not Specified').toUpperCase()})` : 'CASH' }
+    ];
+
+    if (currentPatient.packageProposal?.status === ProposalStatus.SurgeryFixed && currentPatient.packageProposal?.outcomeDate) {
+      rows.push({ label: 'SCHEDULED SURGERY DATE', value: currentPatient.packageProposal.outcomeDate });
+    }
+
+    return rows;
+  }, [currentPatient, proposal.stayDays, proposal.paymentMode]);
+
   return (
     <div className="space-y-4 md:space-y-6 relative">
       {/* Toast Notification */}
@@ -334,18 +360,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
           <table className="w-full border-[0.5px] border-black text-sm table-fixed mb-8">
             <tbody>
-              {[
-                { label: 'PATIENT NAME', value: currentPatient.name.toUpperCase() },
-                { label: 'AGE / SEX', value: `${currentPatient.age} / ${currentPatient.gender}` },
-                { label: 'UHID NO', value: currentPatient.id, isMono: true },
-                { label: 'CONTACT NO', value: currentPatient.mobile, isMono: true },
-                { label: 'REFERRED BY', value: (currentPatient.sourceDoctorName || currentPatient.source).toUpperCase() },
-                { label: 'No of Days of Admission', value: `${proposal.stayDays || '____'} Days` },
-                { label: 'PROPOSED SURGERY', value: (currentPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
-                    ? currentPatient.doctorAssessment.otherSurgeryName 
-                    : (currentPatient.doctorAssessment?.surgeryProcedure || '________________')).toUpperCase() },
-                { label: 'MODE OF PAYMENT', value: proposal.paymentMode?.includes('Insurance') ? `INSURANCE (${(currentPatient.insuranceName || 'Not Specified').toUpperCase()})` : 'CASH' }
-              ].map((row, idx) => (
+              {printableRows.map((row, idx) => (
                 <tr key={idx} className="border-b-[0.5px] border-black last:border-b-0">
                   <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 w-[40%] bg-slate-50 border-r-[0.5px] border-black">{row.label}</td>
                   <td className={`px-4 py-2.5 font-normal text-[12px] text-slate-900 ${row.isMono ? 'font-mono' : ''}`}>{row.value}</td>
