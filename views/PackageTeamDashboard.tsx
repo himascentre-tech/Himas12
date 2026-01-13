@@ -346,7 +346,7 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Official Printable View - Redesigned for Lightweight Look */}
+      {/* Official Printable View - Proposed Tariff */}
       {currentPatient && (
         <div className="hidden print:block print-container p-4 bg-white min-h-screen text-slate-900 leading-[1.3]" style={{ fontFamily: 'Inter, sans-serif' }}>
           <div className="flex justify-between items-start mb-8">
@@ -386,7 +386,6 @@ export const PackageTeamDashboard: React.FC = () => {
             <h3 className="font-bold text-[14px] uppercase mb-3 text-slate-900">Hospital Remarks & Facilities Selection</h3>
             <p className="text-[12px] text-slate-700 leading-relaxed pl-1">
               • Room Selected: <span className="font-semibold underline decoration-slate-300">{proposal.roomType || 'N/A'}</span> <br/>
-              • ICU Status: <span className="font-semibold underline decoration-slate-300">{proposal.icuCharges || 'Excluded'}</span> <br/>
               • Pre-Op Care: <span className="font-semibold underline decoration-slate-300">{proposal.preOpInvestigation || 'Excluded'}</span> <br/>
               • Pharmacy: <span className="font-semibold underline decoration-slate-300">{proposal.surgeryMedicines || 'Excluded'}</span> <br/>
               • Equipment List: <span className="font-semibold">{proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
@@ -403,22 +402,27 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
 
           <div className="bg-slate-50 border-t-[0.5px] border-black p-6 mb-12">
-            <p className="text-[12px] font-semibold text-slate-800 mb-3">NOTE: Requested to pay <span className="text-[14px] font-bold underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
-            <p className="text-[14px] font-bold uppercase tracking-widest text-center py-3 border-y-[0.5px] border-slate-300 mt-4 text-slate-900">ABOVE PACKAGE IS NON-NEGOTIABLE</p>
+            <p className="text-[12px] font-semibold text-slate-800 mb-0">NOTE: Requested to pay <span className="text-[14px] font-bold underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
           </div>
 
-          <div className="mt-24 flex justify-between px-6">
-            <div className="text-center w-1/3">
-              <div className="border-b-[0.5px] border-black mb-3 h-14"></div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposal explained by<br/>(Name and Signature)</p>
+          <div className="mt-12 space-y-12">
+            <div className="text-center">
+              <h2 className="text-[14px] font-bold uppercase tracking-[0.1em] text-slate-900">ABOVE PACKAGE IS NON-NEGOTIABLE</h2>
             </div>
-            <div className="text-center w-1/3">
-              <div className="border-b-[0.5px] border-black mb-3 h-14"></div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">SIGNATURE<br/>(Patient / Authorized Attender)</p>
+            
+            <div className="flex justify-between items-end px-4">
+              <div className="text-center w-[45%]">
+                <div className="border-b-[0.5px] border-black mb-3 h-10 w-full"></div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">PROPOSAL EXPLAINED BY (NAME AND SIGNATURE)</p>
+              </div>
+              <div className="text-center w-[45%]">
+                <div className="border-b-[0.5px] border-black mb-3 h-10 w-full"></div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">SIGNATURE (PATIENT / AUTHORIZED ATTENDER)</p>
+              </div>
             </div>
           </div>
           
-          <div className="mt-20 text-center opacity-40 text-[9px] uppercase font-bold tracking-[0.3em] border-t-[0.5px] pt-4">
+          <div className="mt-24 text-center opacity-40 text-[9px] uppercase font-bold tracking-[0.3em] border-t-[0.5px] pt-4">
             Official Patient Handover Copy • Himas Hospital Management System • Verified {new Date().toLocaleDateString('en-IN', {day: '2-digit', month: 'long', year: 'numeric'})}
           </div>
         </div>
