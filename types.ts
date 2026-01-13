@@ -65,7 +65,7 @@ export enum ProposalStatus {
 
 export enum BookingStatus {
   OPDFix = 'OPD Fix',
-  FollowUp = 'Follow-up',
+  FollowUp = 'Follow-up', // This acts as "Scheduled" in the UI logic
   Arrived = 'Arrived',
 }
 

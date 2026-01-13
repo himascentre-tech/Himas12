@@ -87,7 +87,8 @@ export const DoctorDashboard: React.FC = () => {
     }
   };
 
-  // Filter out patients who have a booking status (meaning they haven't arrived/registered yet)
+  // RULE: Clinical queue ONLY shows patients who have completed registration (bookingStatus === null)
+  // This ensures that "Scheduled Bookings" do not appear until Check-in & Registration is finalized.
   const queue = patients.filter(p => !p.bookingStatus && (!p.doctorAssessment || p.isFollowUpVisit));
   const completed = patients.filter(p => !p.bookingStatus && p.doctorAssessment && !p.isFollowUpVisit);
 

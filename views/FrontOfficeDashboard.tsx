@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -88,7 +89,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
-      if (p.bookingStatus) return; // Exclude bookings from history ledger
+      // RULE: Patients with any bookingStatus are not in the history ledger (Normal OPD workflow)
+      if (p.bookingStatus) return; 
 
       if (p.entry_date === filterDate) {
         let timeDisplay = '--:--';
@@ -133,7 +135,12 @@ export const FrontOfficeDashboard: React.FC = () => {
         
         return matchesSearch && matchesDate;
       })
-      .sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+      .sort((a, b) => {
+        // Sort Arrived patients to the top
+        if (a.bookingStatus === BookingStatus.Arrived && b.bookingStatus !== BookingStatus.Arrived) return -1;
+        if (a.bookingStatus !== BookingStatus.Arrived && b.bookingStatus === BookingStatus.Arrived) return 1;
+        return b.entry_date.localeCompare(a.entry_date);
+      });
   }, [patients, searchTerm, selectedBookingDate]);
 
   useEffect(() => {
@@ -180,7 +187,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
     const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
-    // Check for ID conflicts, but exclude the current editing session if it's the same ID
+    // Check for ID conflicts
     if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
@@ -190,7 +197,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
       
-      // Promoted patients have bookingStatus cleared
+      // RULE: Registration completion clears the booking status, promoting the record to the normal OPD queue
       const submissionData = { 
         ...formData, 
         source: finalSource, 
@@ -201,10 +208,8 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          // Pass original to preserve non-form fields
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         } else {
-          // If original record missing (unlikely), treat as new add
           await addPatient(submissionData as any);
         }
       } else {
@@ -269,7 +274,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const cycleBookingStatus = async (patient: Patient) => {
     let nextStatus: BookingStatus;
-    // Cycle between OPD Fix and Follow-up
+    // Cycle between OPD Fix and Follow-up (Scheduled)
     if (patient.bookingStatus === BookingStatus.OPDFix) nextStatus = BookingStatus.FollowUp;
     else nextStatus = BookingStatus.OPDFix;
 
@@ -282,12 +287,12 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleMarkArrivedAndRegister = async (patient: Patient) => {
     try {
-      // 1. Update status to Arrived in the database first
+      // 1. Update status to Arrived in the database
       if (patient.bookingStatus !== BookingStatus.Arrived) {
         await updatePatient({ ...patient, bookingStatus: BookingStatus.Arrived });
       }
 
-      // 2. Pre-fill Registry form starting from a clean state
+      // 2. Trigger Registration Popup pre-filled with booking data
       let baseSource = patient.source;
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
@@ -305,7 +310,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         id: '' 
       });
       
-      setEditingId(patient.id); // Promoting this BOOK-XXXX ID
+      setEditingId(patient.id); // Promoting the BOOK-XXXX ID via update
       setOtherSourceDetail(detail);
       setStep(1);
       setShowForm(true);
@@ -579,25 +584,30 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <th className="px-6 py-4">Patient Profile</th>
                   <th className="px-6 py-4">Condition</th>
                   <th className="px-6 py-4">Lead Source</th>
-                  <th className="px-6 py-4 text-center">Check-In Action</th>
+                  <th className="px-6 py-4 text-center">Lifecycle Action</th>
                   <th className="px-6 py-4 text-center">Manage</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {bookingList.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={booking.id} className={`hover:bg-slate-50/50 transition-colors group ${booking.bookingStatus === BookingStatus.Arrived ? 'bg-purple-50/20' : ''}`}>
                     <td className="px-6 py-4">
-                      <button 
-                        onClick={() => cycleBookingStatus(booking)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-[10px] border transition-all active:scale-95 ${
-                          booking.bookingStatus === BookingStatus.OPDFix ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' :
-                          booking.bookingStatus === BookingStatus.FollowUp ? 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100' :
-                          'bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100'
-                        }`}
-                      >
-                        {booking.bookingStatus}
-                        <ArrowRight className="w-3 h-3 opacity-30" />
-                      </button>
+                      {booking.bookingStatus === BookingStatus.Arrived ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl font-black text-[10px] border bg-purple-100 text-purple-700 border-purple-200">
+                          <CheckCircle className="w-3 h-3" /> ARRIVED
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => cycleBookingStatus(booking)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold text-[10px] border transition-all active:scale-95 ${
+                            booking.bookingStatus === BookingStatus.OPDFix ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' :
+                            'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
+                          }`}
+                        >
+                          {booking.bookingStatus === BookingStatus.OPDFix ? 'OPD Fix' : 'Follow-up'}
+                          <ArrowRight className="w-3 h-3 opacity-30" />
+                        </button>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
@@ -630,7 +640,8 @@ export const FrontOfficeDashboard: React.FC = () => {
                           : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'
                         }`}
                       >
-                        <UserCheck className="w-4 h-4" /> Check-In Arrived
+                        <UserCheck className="w-4 h-4" /> 
+                        {booking.bookingStatus === BookingStatus.Arrived ? 'Complete Registration' : 'Check-In Arrived'}
                       </button>
                     </td>
                     <td className="px-6 py-4 text-center">
