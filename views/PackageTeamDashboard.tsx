@@ -9,7 +9,7 @@ import {
   DollarSign, Clock, XCircle, Info, CheckCircle2,
   Globe, Loader2, CreditCard, Syringe, ClipboardCheck, BedDouble, Stethoscope as FollowUpIcon,
   FileCheck, ChevronLeft, ChevronRight as ChevronRightIcon,
-  List, ChevronDown, ChevronUp, AlertTriangle, CalendarDays
+  List, ChevronDown, ChevronUp, AlertTriangle, CalendarDays, Printer
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -306,7 +306,7 @@ export const PackageTeamDashboard: React.FC = () => {
     <div className="space-y-4 md:space-y-6 relative">
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-10 right-10 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-10 right-10 z-[100] animate-in fade-in slide-in-from-top-4 duration-300 no-print">
           <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-white border-emerald-100 text-emerald-700' : 'bg-white border-red-100 text-red-700'}`}>
             {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
             <span className="font-bold text-sm">{toast.message}</span>
@@ -314,7 +314,105 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      {/* Hidden Printable View (Matching Image Layout) */}
+      {selectedPatient && (
+        <div className="hidden print:block p-12 bg-white min-h-screen text-slate-900" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <div className="flex flex-col items-center mb-12 border-b-2 border-slate-900 pb-8">
+            <img 
+              src="https://xggnswfyegchwlplzvto.supabase.co/storage/v1/object/public/Himas/himas-file-1%20(4).webp" 
+              alt="Himas Logo" 
+              className="w-56 mb-4" 
+            />
+            <h1 className="text-4xl font-black uppercase tracking-tighter text-slate-900">Himas Hospital</h1>
+            <p className="text-xs font-black text-slate-400 mt-2 uppercase tracking-[0.4em]">Surgical Package Finalization</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-y-6 gap-x-12 mb-12 text-sm border-2 border-slate-50 p-8 rounded-[2rem]">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Patient Name</span>
+              <span className="text-xl font-bold text-slate-900">{selectedPatient.name}</span>
+            </div>
+            <div className="flex flex-col text-right">
+              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">File Registration ID</span>
+              <span className="text-xl font-mono font-black text-hospital-600">{selectedPatient.id}</span>
+            </div>
+            <div className="flex flex-col pt-4 border-t border-slate-100">
+              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Age / Gender</span>
+              <span className="text-base font-bold text-slate-700">{selectedPatient.age}y / {selectedPatient.gender}</span>
+            </div>
+            <div className="flex flex-col pt-4 border-t border-slate-100 text-right">
+              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Mobile Number</span>
+              <span className="text-base font-mono font-bold text-slate-700">{selectedPatient.mobile}</span>
+            </div>
+            <div className="col-span-2 pt-4 border-t border-slate-100">
+              <span className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Recommended Procedure</span>
+              <span className="text-lg font-bold text-slate-900">
+                {selectedPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
+                  ? selectedPatient.doctorAssessment.otherSurgeryName 
+                  : selectedPatient.doctorAssessment?.surgeryProcedure}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-8 px-6">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Mode of payment :</span>
+              <span className="text-lg font-black text-slate-900">{proposal.paymentMode || '____________________'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3">
+              <span className="text-xl font-black text-slate-900 uppercase tracking-tight">Package Amt :</span>
+              <span className="text-3xl font-black text-hospital-700">₹ {proposal.packageAmount?.toLocaleString() || '__________'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Pre op investigation :</span>
+              <span className="text-lg font-black text-slate-900 uppercase">{proposal.preOpInvestigation || '__________'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Surgery Medicines :</span>
+              <span className="text-lg font-black text-slate-900 uppercase">{proposal.surgeryMedicines || '__________'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Equipment (Cases/Mesh/Lap) :</span>
+              <span className="text-lg font-black text-slate-900">
+                {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Included / Excluded'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">ICU charges :</span>
+              <span className="text-lg font-black text-slate-900 uppercase">{proposal.icuCharges || '__________'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Room Type (Private/Deluxe/Semi) :</span>
+              <span className="text-lg font-black text-slate-900">{proposal.roomType || '__________'} (Stay: {proposal.stayDays || '___'} Days)</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <span className="text-base font-bold text-slate-700 uppercase tracking-tight">Post follow up :</span>
+              <span className="text-lg font-black text-slate-900 uppercase">{proposal.postOpFollowUp || '__________'}</span>
+            </div>
+            <div className="flex justify-between items-center pt-10">
+              <span className="text-2xl font-black italic text-slate-900 uppercase tracking-tighter">Recomm. Surgery Date :</span>
+              <span className="text-3xl font-black border-b-4 border-slate-900 px-6 min-w-[200px] text-center">{proposal.outcomeDate || '__________'}</span>
+            </div>
+          </div>
+
+          <div className="mt-40 flex justify-between px-12">
+            <div className="text-center">
+              <div className="w-64 border-b-2 border-slate-900 mb-4"></div>
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Patient / Attendant Sign</p>
+            </div>
+            <div className="text-center">
+              <div className="w-64 border-b-2 border-slate-900 mb-4"></div>
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Authorized Counselor Sign</p>
+            </div>
+          </div>
+          
+          <div className="absolute bottom-12 left-0 right-0 text-center opacity-20">
+            <p className="text-[10px] font-black uppercase tracking-[0.5em]">Official Handover Copy • Himas Hospital Management System</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 no-print">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-800">Counseling Operations</h2>
           <p className="text-gray-500 text-xs md:text-sm">Managing patient conversion pipeline</p>
@@ -330,7 +428,7 @@ export const PackageTeamDashboard: React.FC = () => {
       </div>
 
       {activeTab === 'counseling' ? (
-        <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 no-print">
           <div className="bg-white p-3 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex gap-1 md:gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100 w-full md:w-auto overflow-x-auto no-scrollbar">
               <button onClick={() => setCounselingFilter('PENDING')} className={`px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
@@ -409,7 +507,7 @@ export const PackageTeamDashboard: React.FC = () => {
               )}
             </div>
 
-            <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all duration-300">
+            <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all duration-300 no-print">
               {selectedPatient ? (
                 <div className="flex flex-col h-full">
                   <div className="p-4 md:p-6 border-b bg-slate-50/50 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
@@ -468,8 +566,14 @@ export const PackageTeamDashboard: React.FC = () => {
                     </div>
 
                     <section className="space-y-4">
-                      <div className="flex items-center gap-2 border-l-4 border-hospital-600 pl-3 md:pl-4 py-1">
+                      <div className="flex items-center justify-between border-l-4 border-hospital-600 pl-3 md:pl-4 py-1">
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Surgery Package Details</h3>
+                        <button 
+                          onClick={() => window.print()}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 uppercase tracking-widest"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download PDF
+                        </button>
                       </div>
                       
                       <div className="bg-white border-2 border-slate-50 rounded-3xl p-4 md:p-8 shadow-sm space-y-8 md:space-y-10">
@@ -651,7 +755,7 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="animate-in fade-in slide-in-from-right-4 duration-500 bg-white p-24 rounded-3xl border border-slate-100 shadow-sm text-center">
+        <div className="animate-in fade-in slide-in-from-right-4 duration-500 bg-white p-24 rounded-3xl border border-slate-100 shadow-sm text-center no-print">
            <Users className="w-24 h-24 mx-auto text-purple-600 opacity-20 mb-8" />
            <p className="font-bold text-3xl text-slate-800">Staff Management Console</p>
            <p className="text-base text-slate-400 mt-3 font-medium">Internal administrative features coming soon...</p>
@@ -660,7 +764,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Follow Up Date Modal */}
       {showFollowUpDateModal && (
-        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-10 text-center space-y-8">
               <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
@@ -698,7 +802,7 @@ export const PackageTeamDashboard: React.FC = () => {
       )}
 
       {showSurgeryDateModal && (
-        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-10 text-center space-y-8">
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
@@ -725,7 +829,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 <button 
                   disabled={!proposal.outcomeDate}
                   onClick={() => executeAction(pendingStatus!, proposal.outcomeDate)}
-                  className="flex-[2] py-5 bg-emerald-600 text-white rounded-2xl font-black text-xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-30 active:scale-95"
+                  className="flex-[2] py-5 bg-emerald-600 text-white rounded-2xl font-black text-xl shadow-xl shadow-hospital-100 hover:bg-emerald-700 transition-all disabled:opacity-30 active:scale-95"
                 >
                   Finalize Surgery
                 </button>
@@ -737,7 +841,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Primary Lost Reason Selection Modal */}
       {showLostModal && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-print">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 my-auto">
             <div className="p-8 bg-red-50 border-b border-red-100 flex justify-between items-center">
               <div className="flex items-center gap-4">
@@ -799,7 +903,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Final Confirmation Warning Modal for Lost Patients */}
       {showFinalLostConfirm && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-red-50">
             <div className="p-12 text-center space-y-10">
               <div className="relative inline-block">
