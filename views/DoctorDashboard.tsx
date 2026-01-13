@@ -87,8 +87,9 @@ export const DoctorDashboard: React.FC = () => {
     }
   };
 
-  const queue = patients.filter(p => !p.doctorAssessment || p.isFollowUpVisit);
-  const completed = patients.filter(p => p.doctorAssessment && !p.isFollowUpVisit);
+  // Filter out patients who have a booking status (meaning they haven't arrived/registered yet)
+  const queue = patients.filter(p => !p.bookingStatus && (!p.doctorAssessment || p.isFollowUpVisit));
+  const completed = patients.filter(p => !p.bookingStatus && p.doctorAssessment && !p.isFollowUpVisit);
 
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
