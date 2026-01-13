@@ -302,6 +302,8 @@ export const PackageTeamDashboard: React.FC = () => {
   };
 
   const milestone = getMilestoneInfo();
+  // Narrow selectedPatient for internal rendering blocks to satisfy TS
+  const currentPatient = selectedPatient;
 
   return (
     <div className="space-y-4 md:space-y-6 relative">
@@ -316,7 +318,7 @@ export const PackageTeamDashboard: React.FC = () => {
       )}
 
       {/* Official Printable View - Redesigned for Lightweight Look */}
-      {selectedPatient && (
+      {currentPatient && (
         <div className="hidden print:block print-container p-10 bg-white min-h-screen text-slate-900 leading-[1.3]" style={{ fontFamily: 'Inter, sans-serif' }}>
           <div className="flex justify-between items-start mb-8">
             <img 
@@ -333,16 +335,16 @@ export const PackageTeamDashboard: React.FC = () => {
           <table className="w-full border-[0.5px] border-black text-sm table-fixed mb-8">
             <tbody>
               {[
-                { label: 'PATIENT NAME', value: selectedPatient.name.toUpperCase() },
-                { label: 'AGE / SEX', value: `${selectedPatient.age} / ${selectedPatient.gender}` },
-                { label: 'UHID NO', value: selectedPatient.id, isMono: true },
-                { label: 'CONTACT NO', value: selectedPatient.mobile, isMono: true },
-                { label: 'REFERRED BY', value: (selectedPatient.sourceDoctorName || selectedPatient.source).toUpperCase() },
+                { label: 'PATIENT NAME', value: currentPatient.name.toUpperCase() },
+                { label: 'AGE / SEX', value: `${currentPatient.age} / ${currentPatient.gender}` },
+                { label: 'UHID NO', value: currentPatient.id, isMono: true },
+                { label: 'CONTACT NO', value: currentPatient.mobile, isMono: true },
+                { label: 'REFERRED BY', value: (currentPatient.sourceDoctorName || currentPatient.source).toUpperCase() },
                 { label: 'No of Days of Admission', value: `${proposal.stayDays || '____'} Days` },
-                { label: 'PROPOSED SURGERY', value: (selectedPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
-                    ? selectedPatient.doctorAssessment.otherSurgeryName 
-                    : (selectedPatient.doctorAssessment?.surgeryProcedure || '________________')).toUpperCase() },
-                { label: 'MODE OF PAYMENT', value: proposal.paymentMode?.includes('Insurance') ? `INSURANCE (${(selectedPatient.insuranceName || 'Not Specified').toUpperCase()})` : 'CASH' }
+                { label: 'PROPOSED SURGERY', value: (currentPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
+                    ? currentPatient.doctorAssessment.otherSurgeryName 
+                    : (currentPatient.doctorAssessment?.surgeryProcedure || '________________')).toUpperCase() },
+                { label: 'MODE OF PAYMENT', value: proposal.paymentMode?.includes('Insurance') ? `INSURANCE (${(currentPatient.insuranceName || 'Not Specified').toUpperCase()})` : 'CASH' }
               ].map((row, idx) => (
                 <tr key={idx} className="border-b-[0.5px] border-black last:border-b-0">
                   <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 w-[40%] bg-slate-50 border-r-[0.5px] border-black">{row.label}</td>
@@ -502,16 +504,16 @@ export const PackageTeamDashboard: React.FC = () => {
               </div>
 
               <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all duration-300">
-                {selectedPatient ? (
+                {currentPatient ? (
                   <div className="flex flex-col h-full">
                     <div className="p-4 md:p-6 border-b bg-slate-50/50 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                       <div className="flex items-center gap-4">
                         <div className="bg-white p-2.5 md:p-3 rounded-2xl shadow-sm border border-slate-100"><User className="w-5 md:w-6 h-5 md:h-6 text-hospital-600" /></div>
                         <div>
-                          <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight">{selectedPatient.name}</h3>
+                          <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight">{currentPatient.name}</h3>
                           <div className="flex gap-4 mt-1">
-                            <span className="text-sm font-bold text-slate-500">{selectedPatient.age} yrs • {selectedPatient.gender}</span>
-                            <span className="text-sm font-mono font-bold text-hospital-600 bg-hospital-50 px-2 rounded">{selectedPatient.condition}</span>
+                            <span className="text-sm font-bold text-slate-500">{currentPatient.age} yrs • {currentPatient.gender}</span>
+                            <span className="text-sm font-mono font-bold text-hospital-600 bg-hospital-50 px-2 rounded">{currentPatient.condition}</span>
                           </div>
                         </div>
                       </div>
@@ -538,17 +540,17 @@ export const PackageTeamDashboard: React.FC = () => {
 
                       <div className="flex flex-col items-start lg:items-end">
                         <span className="text-xs font-bold text-slate-400 uppercase mb-1 tracking-wider">Doctor Recommendation</span>
-                        <span className="bg-hospital-600 text-white px-3 py-1 rounded-lg text-xs font-black">{selectedPatient.doctorAssessment?.quickCode}</span>
+                        <span className="bg-hospital-600 text-white px-3 py-1 rounded-lg text-xs font-black">{currentPatient.doctorAssessment?.quickCode}</span>
                       </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-10">
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         {[
-                          { label: 'Source', icon: Globe, value: selectedPatient.source },
-                          { label: 'Insurance', icon: ShieldCheck, value: selectedPatient.hasInsurance },
-                          { label: 'Occupation', icon: Briefcase, value: selectedPatient.occupation },
-                          { label: 'Mobile', icon: Phone, value: selectedPatient.mobile }
+                          { label: 'Source', icon: Globe, value: currentPatient.source },
+                          { label: 'Insurance', icon: ShieldCheck, value: currentPatient.hasInsurance },
+                          { label: 'Occupation', icon: Briefcase, value: currentPatient.occupation },
+                          { label: 'Mobile', icon: Phone, value: currentPatient.mobile }
                         ].map((item, idx) => (
                           <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                             <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">
