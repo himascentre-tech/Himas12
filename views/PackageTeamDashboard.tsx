@@ -333,37 +333,24 @@ export const PackageTeamDashboard: React.FC = () => {
           <table className="w-full border-4 border-slate-900 text-lg mb-10 table-fixed">
             <tbody>
               <tr>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase w-1/3 bg-slate-50">PATIENT NAME</td>
-                <td className="border-4 border-slate-900 p-5 font-bold uppercase w-1/2">{selectedPatient.name}</td>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase w-1/6 text-center">INSURANCE</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase w-[40%] bg-slate-50">PATIENT NAME</td>
+                <td className="border-4 border-slate-900 p-5 font-bold uppercase w-[60%]">{selectedPatient.name}</td>
               </tr>
               <tr>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">AGE/SEX</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">AGE / SEX</td>
                 <td className="border-4 border-slate-900 p-5 font-bold">{selectedPatient.age} / {selectedPatient.gender}</td>
-                <td className="border-4 border-slate-900 p-5 flex justify-center items-center">
-                  <div className="w-10 h-10 border-4 border-slate-900 flex items-center justify-center">
-                    {(proposal.paymentMode?.includes('Insurance')) && <div className="w-6 h-6 bg-slate-900" />}
-                  </div>
-                </td>
               </tr>
               <tr>
                 <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">UHID NO</td>
                 <td className="border-4 border-slate-900 p-5 font-bold font-mono text-2xl">{selectedPatient.id}</td>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase text-center">CASH</td>
               </tr>
               <tr>
                 <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">CONTACT NO</td>
                 <td className="border-4 border-slate-900 p-5 font-bold font-mono">{selectedPatient.mobile}</td>
-                <td className="border-4 border-slate-900 p-5 flex justify-center items-center">
-                  <div className="w-10 h-10 border-4 border-slate-900 flex items-center justify-center">
-                    {proposal.paymentMode === 'Cash' && <div className="w-6 h-6 bg-slate-900" />}
-                  </div>
-                </td>
               </tr>
               <tr>
                 <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">REFERRED BY</td>
                 <td className="border-4 border-slate-900 p-5 font-bold uppercase">{selectedPatient.sourceDoctorName || selectedPatient.source}</td>
-                <td className="border-4 border-slate-900 p-5 bg-slate-50" rowSpan={6}></td>
               </tr>
               <tr>
                 <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">No of Days of Admission</td>
@@ -379,18 +366,18 @@ export const PackageTeamDashboard: React.FC = () => {
               </tr>
               <tr>
                 <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">MODE OF PAYMENT</td>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase">
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-white">
                    {proposal.paymentMode?.includes('Insurance') ? `Insurance (${selectedPatient.insuranceName || 'Not Specified'})` : 'Cash'}
                 </td>
               </tr>
               {proposal.paymentMode?.includes('Insurance') && (
                 <tr>
-                  <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">DOCUMENTS SHARED</td>
+                  <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">INSURANCE DOCUMENTS SHARED</td>
                   <td className="border-4 border-slate-900 p-5 font-bold uppercase">{proposal.insuranceDocShared || '________________'}</td>
                 </tr>
               )}
               <tr>
-                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">Proposed Package</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">Proposed Package Amount</td>
                 <td className="border-4 border-slate-900 p-5 font-black text-3xl bg-slate-100">₹ {proposal.packageAmount?.toLocaleString() || '________________'}</td>
               </tr>
             </tbody>
@@ -401,7 +388,7 @@ export const PackageTeamDashboard: React.FC = () => {
             <p className="text-xl font-bold text-slate-800 leading-relaxed italic">
               Selected Room: <span className="underline">{proposal.roomType || 'N/A'}</span> • ICU Status: <span className="underline">{proposal.icuCharges || 'Excluded'}</span> • Pre-Op Care: <span className="underline">{proposal.preOpInvestigation || 'Excluded'}</span> • Pharmacy: <span className="underline">{proposal.surgeryMedicines || 'Excluded'}</span>
               <br />
-              <span className="mt-3 block">Equipment List: {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
+              <span className="mt-3 block font-black not-italic text-slate-900">Equipment Selection: {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
             </p>
           </div>
 
@@ -623,18 +610,6 @@ export const PackageTeamDashboard: React.FC = () => {
                               {proposal.paymentMode?.includes('Insurance') && (
                                 <div className="mt-4 p-5 bg-hospital-50 border border-hospital-100 rounded-2xl space-y-6 animate-in fade-in slide-in-from-top-1">
                                   <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-hospital-600 uppercase tracking-widest mb-2">
-                                      <Shield className="w-4 h-4" /> Insurance Name
-                                    </label>
-                                    <input 
-                                      type="text" 
-                                      placeholder="Provider Name..." 
-                                      className="w-full p-3 border-2 border-hospital-100 rounded-xl font-bold text-hospital-700 outline-none focus:border-hospital-500 bg-white"
-                                      value={selectedPatient.insuranceName || ''}
-                                      onChange={(e) => updatePatient({ ...selectedPatient, insuranceName: e.target.value })}
-                                    />
-                                  </div>
-                                  <div>
                                     <label className="flex items-center gap-2 text-xs font-bold text-hospital-600 uppercase tracking-widest mb-4">
                                       <FileCheck className="w-4 h-4" /> Document Shared?
                                     </label>
@@ -713,7 +688,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                             <div className="space-y-3">
-                              <label className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-widest">
+                              <label className="flex items-center gap-2 text-xs font-bold text-hospital-500 uppercase tracking-widest">
                                 <BedDouble className="w-4 h-4 text-hospital-500" /> Room Type
                               </label>
                               <select className="w-full p-5 border-2 border-slate-100 rounded-xl font-bold text-slate-800 focus:border-hospital-500 outline-none text-base bg-slate-50/30" value={proposal.roomType || ''} onChange={e => setProposal({ ...proposal, roomType: e.target.value as any })}>
@@ -830,11 +805,11 @@ export const PackageTeamDashboard: React.FC = () => {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <button onClick={() => setShowFollowUpDateModal(false)} className="flex-1 py-5 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all text-base">Cancel</button>
+                <button onClick={() => setShowFollowUpDateModal(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all text-base">Cancel</button>
                 <button 
                   disabled={!proposal.followUpDate}
                   onClick={() => executeAction(ProposalStatus.FollowUp, proposal.followUpDate)}
-                  className="flex-[2] py-5 bg-hospital-600 text-white rounded-2xl font-black text-xl shadow-xl shadow-hospital-100 hover:bg-hospital-700 transition-all disabled:opacity-30 active:scale-95"
+                  className="flex-[2] py-4 bg-hospital-600 text-white rounded-2xl font-black text-xl shadow-xl shadow-hospital-100 hover:bg-hospital-700 transition-all disabled:opacity-30 active:scale-95"
                 >
                   Set Follow-up
                 </button>
@@ -868,7 +843,7 @@ export const PackageTeamDashboard: React.FC = () => {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <button onClick={() => setShowSurgeryDateModal(false)} className="flex-1 py-5 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all text-base">Cancel</button>
+                <button onClick={() => setShowSurgeryDateModal(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all text-base">Cancel</button>
                 <button 
                   disabled={!proposal.outcomeDate}
                   onClick={() => executeAction(pendingStatus!, proposal.outcomeDate)}
