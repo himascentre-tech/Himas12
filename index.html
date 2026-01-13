@@ -31,31 +31,26 @@
         margin: 0;
       }
       @media print {
-        /* Hide everything by default */
         body * {
           visibility: hidden;
           margin: 0 !important;
           padding: 0 !important;
         }
-        /* Specifically show only the printable content */
         .print-container, .print-container * {
           visibility: visible;
         }
-        /* Position the print container to the very top left */
         .print-container {
           position: absolute;
           left: 0;
           top: 0;
           width: 100%;
           margin: 0 !important;
-          padding: 20px !important; /* Some padding for A4 safe zones */
+          padding: 20px !important;
           visibility: visible !important;
         }
-        /* Strict removal of UI elements */
         .no-print {
           display: none !important;
         }
-        /* Remove browser headers and footers */
         @page {
           margin: 0;
           size: auto;
@@ -69,15 +64,16 @@
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19.0.0",
+    "@google/genai": "https://esm.sh/@google/genai@1.33.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.10.1"
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
