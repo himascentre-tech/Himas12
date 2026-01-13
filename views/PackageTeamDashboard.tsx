@@ -401,26 +401,28 @@ export const PackageTeamDashboard: React.FC = () => {
             </ol>
           </div>
 
-          <div className="bg-slate-50 border-t-[0.5px] border-black p-6 mb-8">
-            <p className="text-[12px] font-semibold text-slate-800 mb-0">NOTE: Requested to pay <span className="text-[14px] font-bold underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
-          </div>
-
-          <div className="mt-6">
-            <h2 className="text-[14px] font-bold uppercase tracking-tight text-center mb-10">ABOVE PACKAGE IS NON-NEGOTIABLE</h2>
+          <div className="border-t-[0.5px] border-black pt-6 mb-12">
+            <p className="text-[12px] font-bold text-slate-900 text-center mb-10 italic">
+              NOTE: Requested to pay <span className="underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT
+            </p>
             
-            <div className="flex justify-between items-end gap-12 px-2">
-              <div className="flex-1 text-center">
-                <div className="border-b-[0.5px] border-black mb-2 h-10 w-full"></div>
-                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">PROPOSAL EXPLAINED BY (NAME AND SIGNATURE)</p>
-              </div>
-              <div className="flex-1 text-center">
-                <div className="border-b-[0.5px] border-black mb-2 h-10 w-full"></div>
-                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">SIGNATURE (PATIENT / AUTHORIZED ATTENDER)</p>
+            <div className="space-y-16">
+              <h2 className="text-[14px] font-bold uppercase tracking-[0.1em] text-center text-slate-900">ABOVE PACKAGE IS NON-NEGOTIABLE</h2>
+              
+              <div className="flex justify-between items-end gap-16 px-4">
+                <div className="flex-1 text-center">
+                  <div className="border-b-[1px] border-black mb-2 h-10 w-full"></div>
+                  <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">PROPOSAL EXPLAINED BY (NAME AND SIGNATURE)</p>
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="border-b-[1px] border-black mb-2 h-10 w-full"></div>
+                  <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">SIGNATURE (PATIENT / AUTHORIZED ATTENDER)</p>
+                </div>
               </div>
             </div>
           </div>
           
-          <div className="mt-20 text-center opacity-40 text-[9px] uppercase font-bold tracking-[0.3em] border-t-[0.5px] pt-4">
+          <div className="mt-auto text-center opacity-40 text-[9px] uppercase font-bold tracking-[0.3em] border-t-[0.5px] pt-4">
             Official Patient Handover Copy • Himas Hospital Management System • Verified {new Date().toLocaleDateString('en-IN', {day: '2-digit', month: 'long', year: 'numeric'})}
           </div>
         </div>
