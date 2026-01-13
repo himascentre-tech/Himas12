@@ -317,128 +317,128 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Official Printable View - Matches 'PROPOSED TARIFF' Form */}
       {selectedPatient && (
-        <div className="hidden print:block p-10 bg-white min-h-screen text-slate-900 leading-tight" style={{ fontFamily: 'Times New Roman, serif' }}>
-          <div className="flex justify-between items-start mb-6">
+        <div className="hidden print:block print-container p-12 bg-white min-h-screen text-slate-900 leading-tight" style={{ fontFamily: 'Times New Roman, serif' }}>
+          <div className="flex justify-between items-start mb-8">
             <img 
               src="https://xggnswfyegchwlplzvto.supabase.co/storage/v1/object/public/Himas/himas-file-1%20(4).webp" 
               alt="Himas Logo" 
-              className="w-56" 
+              className="w-64" 
             />
             <div className="text-right">
-              <h1 className="text-3xl font-black uppercase tracking-tight border-b-4 border-slate-900 pb-1">PROPOSED TARIFF</h1>
-              <p className="text-lg font-bold mt-2 uppercase">DATE: {today}</p>
+              <h1 className="text-4xl font-black uppercase tracking-tight border-b-4 border-slate-900 pb-2">PROPOSED TARIFF</h1>
+              <p className="text-xl font-bold mt-3 uppercase">DATE: {today}</p>
             </div>
           </div>
 
-          <table className="w-full border-2 border-slate-900 text-base mb-8 table-fixed">
+          <table className="w-full border-4 border-slate-900 text-lg mb-10 table-fixed">
             <tbody>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase w-1/3 bg-slate-50/50">PATIENT NAME</td>
-                <td className="border-2 border-slate-900 p-4 font-bold uppercase w-1/2">{selectedPatient.name}</td>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase w-1/6 text-center">INSURANCE</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase w-1/3 bg-slate-50">PATIENT NAME</td>
+                <td className="border-4 border-slate-900 p-5 font-bold uppercase w-1/2">{selectedPatient.name}</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase w-1/6 text-center">INSURANCE</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">AGE/SEX</td>
-                <td className="border-2 border-slate-900 p-4 font-bold">{selectedPatient.age} / {selectedPatient.gender}</td>
-                <td className="border-2 border-slate-900 p-4 flex justify-center items-center h-full">
-                  <div className="w-8 h-8 border-2 border-slate-900 flex items-center justify-center">
-                    {(proposal.paymentMode?.includes('Insurance')) && <div className="w-5 h-5 bg-slate-900" />}
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">AGE/SEX</td>
+                <td className="border-4 border-slate-900 p-5 font-bold">{selectedPatient.age} / {selectedPatient.gender}</td>
+                <td className="border-4 border-slate-900 p-5 flex justify-center items-center">
+                  <div className="w-10 h-10 border-4 border-slate-900 flex items-center justify-center">
+                    {(proposal.paymentMode?.includes('Insurance')) && <div className="w-6 h-6 bg-slate-900" />}
                   </div>
                 </td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">UHID NO</td>
-                <td className="border-2 border-slate-900 p-4 font-bold font-mono text-xl">{selectedPatient.id}</td>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase text-center">CASH</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">UHID NO</td>
+                <td className="border-4 border-slate-900 p-5 font-bold font-mono text-2xl">{selectedPatient.id}</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase text-center">CASH</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">CONTACT NO</td>
-                <td className="border-2 border-slate-900 p-4 font-bold font-mono">{selectedPatient.mobile}</td>
-                <td className="border-2 border-slate-900 p-4 flex justify-center items-center h-full">
-                  <div className="w-8 h-8 border-2 border-slate-900 flex items-center justify-center">
-                    {proposal.paymentMode === 'Cash' && <div className="w-5 h-5 bg-slate-900" />}
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">CONTACT NO</td>
+                <td className="border-4 border-slate-900 p-5 font-bold font-mono">{selectedPatient.mobile}</td>
+                <td className="border-4 border-slate-900 p-5 flex justify-center items-center">
+                  <div className="w-10 h-10 border-4 border-slate-900 flex items-center justify-center">
+                    {proposal.paymentMode === 'Cash' && <div className="w-6 h-6 bg-slate-900" />}
                   </div>
                 </td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">REFERRED BY</td>
-                <td className="border-2 border-slate-900 p-4 font-bold uppercase">{selectedPatient.sourceDoctorName || selectedPatient.source}</td>
-                <td className="border-2 border-slate-900 p-4" rowSpan={6}></td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">REFERRED BY</td>
+                <td className="border-4 border-slate-900 p-5 font-bold uppercase">{selectedPatient.sourceDoctorName || selectedPatient.source}</td>
+                <td className="border-4 border-slate-900 p-5 bg-slate-50" rowSpan={6}></td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">No of Days of Admission</td>
-                <td className="border-2 border-slate-900 p-4 font-bold">{proposal.stayDays || '____'} Days</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">No of Days of Admission</td>
+                <td className="border-4 border-slate-900 p-5 font-bold">{proposal.stayDays || '____'} Days</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">PROPOSED SURGERY</td>
-                <td className="border-2 border-slate-900 p-4 font-bold uppercase">
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">PROPOSED SURGERY</td>
+                <td className="border-4 border-slate-900 p-5 font-bold uppercase">
                   {selectedPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
                     ? selectedPatient.doctorAssessment.otherSurgeryName 
                     : (selectedPatient.doctorAssessment?.surgeryProcedure || '________________')}
                 </td>
               </tr>
+              <tr>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">MODE OF PAYMENT</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase">
+                   {proposal.paymentMode?.includes('Insurance') ? `Insurance (${selectedPatient.insuranceName || 'Not Specified'})` : 'Cash'}
+                </td>
+              </tr>
               {proposal.paymentMode?.includes('Insurance') && (
-                <>
-                  <tr>
-                    <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">INSURANCE NAME</td>
-                    <td className="border-2 border-slate-900 p-4 font-bold uppercase">{selectedPatient.insuranceName || '________________'}</td>
-                  </tr>
-                  <tr>
-                    <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">DOCUMENTS SHARED</td>
-                    <td className="border-2 border-slate-900 p-4 font-bold uppercase">{proposal.insuranceDocShared || '________________'}</td>
-                  </tr>
-                </>
+                <tr>
+                  <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">DOCUMENTS SHARED</td>
+                  <td className="border-4 border-slate-900 p-5 font-bold uppercase">{proposal.insuranceDocShared || '________________'}</td>
+                </tr>
               )}
               <tr>
-                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">Proposed Package</td>
-                <td className="border-2 border-slate-900 p-4 font-black text-2xl bg-slate-50">₹ {proposal.packageAmount?.toLocaleString() || '________________'}</td>
+                <td className="border-4 border-slate-900 p-5 font-black uppercase bg-slate-50">Proposed Package</td>
+                <td className="border-4 border-slate-900 p-5 font-black text-3xl bg-slate-100">₹ {proposal.packageAmount?.toLocaleString() || '________________'}</td>
               </tr>
             </tbody>
           </table>
 
-          <div className="border-2 border-slate-900 p-6 mb-8 min-h-[100px] relative">
-            <p className="text-xs font-black uppercase mb-4 opacity-40">Hospital Remarks & Facilities Selection</p>
-            <p className="text-base font-bold text-slate-800 leading-relaxed italic">
+          <div className="border-4 border-slate-900 p-8 mb-10 min-h-[120px] relative">
+            <p className="text-sm font-black uppercase mb-4 opacity-40">Hospital Remarks & Facilities Selection</p>
+            <p className="text-xl font-bold text-slate-800 leading-relaxed italic">
               Selected Room: <span className="underline">{proposal.roomType || 'N/A'}</span> • ICU Status: <span className="underline">{proposal.icuCharges || 'Excluded'}</span> • Pre-Op Care: <span className="underline">{proposal.preOpInvestigation || 'Excluded'}</span> • Pharmacy: <span className="underline">{proposal.surgeryMedicines || 'Excluded'}</span>
               <br />
-              <span className="mt-2 block">Equipment List: {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
+              <span className="mt-3 block">Equipment List: {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
             </p>
           </div>
 
-          <div className="mb-10">
-            <h3 className="font-black underline uppercase mb-4 text-lg">Terms and Conditions</h3>
-            <ol className="list-decimal list-inside space-y-3 text-sm font-bold leading-snug">
+          <div className="mb-12">
+            <h3 className="font-black underline uppercase mb-6 text-2xl">Terms and Conditions</h3>
+            <ol className="list-decimal list-inside space-y-4 text-lg font-bold leading-snug">
               <li>ICU Admission / Special Investigations / Special Injections / Special Consultation / Blood Transfusions - <span className="underline italic">IF ANY</span> - <span className="text-red-700">CHARGES EXTRA</span></li>
               <li>Ward Charges for One Day (24 Hrs) - For Proposed Package (Based on standard Bill Cycles)</li>
               <li>ICU Admission - <span className="uppercase text-red-700">CHARGES EXTRA</span> (without Ventilator - 15000/day AND with Ventilator - 25000/day)</li>
             </ol>
           </div>
 
-          <div className="bg-slate-50 border-l-[12px] border-slate-900 p-8 mb-12 shadow-sm">
-            <p className="text-base font-black mb-4">NOTE: Requested to pay <span className="text-xl underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
-            <p className="text-xl font-black uppercase tracking-widest text-center py-4 border-y-2 border-slate-900 mt-4 bg-white">ABOVE PACKAGE IS NON-NEGOTIABLE</p>
+          <div className="bg-slate-50 border-l-[16px] border-slate-900 p-10 mb-14 shadow-sm">
+            <p className="text-xl font-black mb-6">NOTE: Requested to pay <span className="text-2xl underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
+            <p className="text-2xl font-black uppercase tracking-widest text-center py-6 border-y-4 border-slate-900 mt-6 bg-white">ABOVE PACKAGE IS NON-NEGOTIABLE</p>
           </div>
 
-          <div className="mt-32 flex justify-between px-6">
+          <div className="mt-40 flex justify-between px-10">
             <div className="text-center w-1/3">
-              <div className="border-b-2 border-slate-900 mb-4 h-16 flex items-end justify-center">
-                 <span className="text-[10px] font-mono opacity-10">OFFICIAL COUNSELOR STAMP</span>
+              <div className="border-b-4 border-slate-900 mb-6 h-20 flex items-end justify-center">
+                 <span className="text-xs font-mono opacity-10">OFFICIAL COUNSELOR STAMP</span>
               </div>
-              <p className="text-xs font-black uppercase tracking-widest">Proposal explained by<br/>(Name and Signature)</p>
+              <p className="text-sm font-black uppercase tracking-widest">Proposal explained by<br/>(Name and Signature)</p>
             </div>
             <div className="text-center w-1/3">
-              <div className="border-b-2 border-slate-900 mb-4 h-16"></div>
-              <p className="text-xs font-black uppercase tracking-widest">SIGNATURE<br/>(Patient / Authorized Attender)</p>
+              <div className="border-b-4 border-slate-900 mb-6 h-20"></div>
+              <p className="text-sm font-black uppercase tracking-widest">SIGNATURE<br/>(Patient / Authorized Attender)</p>
             </div>
           </div>
           
-          <div className="mt-24 text-center opacity-30 text-[9px] uppercase font-black tracking-[0.5em] border-t pt-4">
+          <div className="mt-32 text-center opacity-30 text-xs uppercase font-black tracking-[0.5em] border-t-2 pt-6">
             Official Patient Handover Copy • Himas Hospital Management System • Verified {new Date().toLocaleDateString('en-IN', {day: '2-digit', month: 'long', year: 'numeric'})}
           </div>
         </div>
       )}
 
-      {/* Standard UI Layout - Wrapped in no-print to ensure complete exclusion */}
+      {/* Standard UI Layout - Strictly Hidden During Print */}
       <div className="no-print space-y-4 md:space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>

@@ -28,18 +28,41 @@
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
+        margin: 0;
       }
       @media print {
+        /* Hide everything by default */
+        body * {
+          visibility: hidden;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        /* Specifically show only the printable content */
+        .print-container, .print-container * {
+          visibility: visible;
+        }
+        /* Position the print container to the very top left */
+        .print-container {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          margin: 0 !important;
+          padding: 20px !important; /* Some padding for A4 safe zones */
+          visibility: visible !important;
+        }
+        /* Strict removal of UI elements */
         .no-print {
           display: none !important;
         }
+        /* Remove browser headers and footers */
         @page {
           margin: 0;
+          size: auto;
         }
-        body {
-          margin: 0;
-          padding: 0;
-          background-color: white !important;
+        html, body {
+          height: auto;
+          overflow: visible !important;
         }
       }
     </style>
