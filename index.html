@@ -31,17 +31,20 @@
         margin: 0;
       }
       @media print {
-        /* Hide non-print content */
+        /* Hide everything by default using visibility */
         body * {
           visibility: hidden;
         }
         
-        /* Specific print elements to show */
-        .print-container, .print-container * {
+        /* Show print-container and its entire subtree */
+        .print-container, 
+        .print-container * {
           visibility: visible !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
 
-        /* Fix container to start of printable area */
+        /* Reset the container to take over the whole page */
         .print-container {
           position: absolute;
           left: 0;
@@ -51,13 +54,14 @@
           background: white !important;
         }
 
+        /* Fully remove no-print items from the flow */
         .no-print {
           display: none !important;
+          visibility: hidden !important;
         }
 
-        /* Define consistent page margins */
         @page {
-          margin: 20mm;
+          margin: 15mm;
           size: A4 portrait;
         }
 

@@ -4,17 +4,16 @@ import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
 import { 
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
-  Download, ChevronRight, Stethoscope, User, Activity, 
-  ShieldCheck, Phone, MapPin, AlertCircle, TrendingUp,
-  DollarSign, Clock, XCircle, Info, CheckCircle2,
+  Download, User, Activity, 
+  ShieldCheck, Phone, AlertCircle,
+  DollarSign, Clock, XCircle, CheckCircle2,
   Globe, Loader2, CreditCard, Syringe, ClipboardCheck, BedDouble, Stethoscope as FollowUpIcon,
   FileCheck, ChevronLeft, ChevronRight as ChevronRightIcon,
-  List, ChevronDown, ChevronUp, AlertTriangle, CalendarDays, Printer,
-  Square, Shield
+  ChevronDown, ChevronUp, AlertTriangle, CalendarDays
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
-  const { patients, updatePackageProposal, updatePatient } = useHospital();
+  const { patients, updatePackageProposal } = useHospital();
   
   const [activeTab, setActiveTab] = useState<'counseling' | 'staff'>('counseling');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -25,7 +24,6 @@ export const PackageTeamDashboard: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   
   const [aiLoading, setAiLoading] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
   
   // States for Modals
   const [showLostModal, setShowLostModal] = useState(false);
@@ -110,11 +108,10 @@ export const PackageTeamDashboard: React.FC = () => {
       const dateB = b.packageProposal?.followUpDate || b.entry_date;
       return dateB.localeCompare(dateA);
     });
-  }, [patients, counselingFilter, today, startDate, endDate]);
+  }, [patients, counselingFilter, startDate, endDate]);
 
   const handlePatientSelect = (p: Patient) => {
     setSelectedPatient(p);
-    setValidationError(null);
     setProposal({
       decisionPattern: '',
       objectionIdentified: '',
@@ -131,7 +128,6 @@ export const PackageTeamDashboard: React.FC = () => {
       equipment: [],
       ...p.packageProposal
     });
-    // On mobile, auto-collapse sidebar once selected to focus on form
     if (window.innerWidth < 768) {
       setIsSidebarCollapsed(true);
     }
@@ -302,13 +298,10 @@ export const PackageTeamDashboard: React.FC = () => {
   };
 
   const milestone = getMilestoneInfo();
-  // Narrow selectedPatient for internal rendering blocks to satisfy TS
   const currentPatient = selectedPatient;
 
-  // Computed rows for printable table
   const printableRows = useMemo(() => {
     if (!currentPatient) return [];
-    
     const docAssessment = currentPatient.doctorAssessment;
     const packageProp = currentPatient.packageProposal;
 
@@ -330,13 +323,11 @@ export const PackageTeamDashboard: React.FC = () => {
     if (packageProp?.status === ProposalStatus.SurgeryFixed && packageProp?.outcomeDate) {
       rows.push({ label: 'SCHEDULED SURGERY DATE', value: packageProp.outcomeDate });
     }
-
     return rows;
-  }, [currentPatient, proposal.stayDays, proposal.paymentMode]);
+  }, [currentPatient, proposal.stayDays, proposal.paymentMode, proposal.outcomeDate]);
 
   return (
     <div className="space-y-4 md:space-y-6 relative">
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-10 right-10 z-[100] animate-in fade-in slide-in-from-top-4 duration-300 no-print">
           <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-white border-emerald-100 text-emerald-700' : 'bg-white border-red-100 text-red-700'}`}>
@@ -346,12 +337,11 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Official Printable View - Proposed Tariff */}
       {currentPatient && (
         <div className="hidden print:block print-container p-4 bg-white min-h-screen text-slate-900 leading-[1.3]" style={{ fontFamily: 'Inter, sans-serif' }}>
           <div className="flex justify-between items-start mb-8">
             <div className="text-left">
-              <h1 className="text-xl font-bold uppercase tracking-tight pb-1">PROPOSED TARIFF</h1>
+              <h1 className="text-xl font-bold uppercase tracking-tight pb-1 text-black">PROPOSED TARIFF</h1>
               <p className="text-xs font-semibold text-slate-500 uppercase">DATE: {today}</p>
             </div>
             <img 
@@ -365,13 +355,13 @@ export const PackageTeamDashboard: React.FC = () => {
             <tbody>
               {printableRows.map((row, idx) => (
                 <tr key={idx} className="border-b-[0.5px] border-black last:border-b-0">
-                  <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 w-[40%] bg-slate-50 border-r-[0.5px] border-black">{row.label}</td>
+                  <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 w-[40%] bg-slate-50 border-r-[0.5px] border-black uppercase">{row.label}</td>
                   <td className={`px-4 py-2.5 font-normal text-[12px] text-slate-900 ${row.isMono ? 'font-mono' : ''}`}>{row.value}</td>
                 </tr>
               ))}
               {proposal.paymentMode?.includes('Insurance') && (
                 <tr className="border-b-[0.5px] border-black">
-                  <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 bg-slate-50 border-r-[0.5px] border-black">INSURANCE DOCUMENTS SHARED</td>
+                  <td className="px-4 py-2.5 font-semibold text-[11px] text-slate-600 bg-slate-50 border-r-[0.5px] border-black uppercase tracking-tight">INSURANCE DOCUMENTS SHARED</td>
                   <td className="px-4 py-2.5 font-normal text-[12px] text-slate-900">{proposal.insuranceDocShared || '________________'}</td>
                 </tr>
               )}
@@ -383,7 +373,7 @@ export const PackageTeamDashboard: React.FC = () => {
           </table>
 
           <div className="mb-8">
-            <h3 className="font-bold text-[14px] uppercase mb-3 text-slate-900">Hospital Remarks & Facilities Selection</h3>
+            <h3 className="font-bold text-[14px] uppercase mb-3 text-black">Hospital Remarks & Facilities Selection</h3>
             <p className="text-[12px] text-slate-700 leading-relaxed pl-1">
               • Room Selected: <span className="font-semibold underline decoration-slate-300">{proposal.roomType || 'N/A'}</span> <br/>
               • Pre-Op Care: <span className="font-semibold underline decoration-slate-300">{proposal.preOpInvestigation || 'Excluded'}</span> <br/>
@@ -393,30 +383,30 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
 
           <div className="mb-10">
-            <h3 className="font-bold text-[14px] uppercase mb-3 text-slate-900">Terms and Conditions</h3>
+            <h3 className="font-bold text-[14px] uppercase mb-3 text-black">Terms and Conditions</h3>
             <ol className="list-decimal list-inside space-y-2 text-[11px] font-medium text-slate-600 leading-[1.4]">
-              <li>ICU Admission / Special Investigations / Special Injections / Special Consultation / Blood Transfusions - <span className="italic underline underline-offset-2">IF ANY</span> - <span className="text-red-700 font-semibold">CHARGES EXTRA</span></li>
+              <li>ICU Admission / Special Investigations / Special Injections / Special Consultation / Blood Transfusions - <span className="italic underline underline-offset-2 text-black">IF ANY</span> - <span className="text-red-700 font-bold uppercase">CHARGES EXTRA</span></li>
               <li>Ward Charges for One Day (24 Hrs) - For Proposed Package (Based on standard Bill Cycles)</li>
-              <li>ICU Admission - <span className="uppercase text-red-700 font-semibold">CHARGES EXTRA</span> (without Ventilator - 15000/day AND with Ventilator - 25000/day)</li>
+              <li>ICU Admission - <span className="uppercase text-red-700 font-bold">CHARGES EXTRA</span> (without Ventilator - 15000/day AND with Ventilator - 25000/day)</li>
             </ol>
           </div>
 
-          <div className="border-t-[0.5px] border-black pt-6 mb-12">
-            <p className="text-[12px] font-bold text-slate-900 text-center mb-10 italic">
-              NOTE: Requested to pay <span className="underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT
+          <div className="border-t-[1px] border-black pt-8 mb-4">
+            <p className="text-[11px] font-bold text-black text-center mb-8 italic">
+              NOTE: Requested to pay <span className="underline decoration-black decoration-2">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT
             </p>
             
-            <div className="space-y-16">
-              <h2 className="text-[14px] font-bold uppercase tracking-[0.1em] text-center text-slate-900">ABOVE PACKAGE IS NON-NEGOTIABLE</h2>
+            <div className="mt-12">
+              <h2 className="text-[14px] font-bold uppercase tracking-[0.2em] text-center text-black mb-16">ABOVE PACKAGE IS NON-NEGOTIABLE</h2>
               
               <div className="flex justify-between items-end gap-16 px-4">
                 <div className="flex-1 text-center">
-                  <div className="border-b-[1px] border-black mb-2 h-10 w-full"></div>
-                  <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">PROPOSAL EXPLAINED BY (NAME AND SIGNATURE)</p>
+                  <div className="border-b-[2px] border-black mb-4 h-12 w-full"></div>
+                  <p className="text-[10px] font-bold uppercase tracking-tight text-black leading-tight">PROPOSAL EXPLAINED BY<br/>(NAME AND SIGNATURE)</p>
                 </div>
                 <div className="flex-1 text-center">
-                  <div className="border-b-[1px] border-black mb-2 h-10 w-full"></div>
-                  <p className="text-[9px] font-bold uppercase tracking-tight text-slate-600">SIGNATURE (PATIENT / AUTHORIZED ATTENDER)</p>
+                  <div className="border-b-[2px] border-black mb-4 h-12 w-full"></div>
+                  <p className="text-[10px] font-bold uppercase tracking-tight text-black leading-tight">SIGNATURE<br/>(PATIENT / AUTHORIZED ATTENDER)</p>
                 </div>
               </div>
             </div>
@@ -428,7 +418,6 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Standard Dashboard UI - Wrapped in no-print */}
       <div className="no-print space-y-4 md:space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
@@ -540,7 +529,6 @@ export const PackageTeamDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Middle: Scheduled Date Indicator */}
                       <div className="flex flex-col flex-1 items-center justify-center">
                         {milestone ? (
                           <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl border shadow-sm ${milestone.bg} ${milestone.border} animate-in fade-in zoom-in-95 duration-300`}>
@@ -609,7 +597,6 @@ export const PackageTeamDashboard: React.FC = () => {
                                 ))}
                               </div>
 
-                              {/* Conditional Insurance Fields */}
                               {proposal.paymentMode?.includes('Insurance') && (
                                 <div className="mt-4 p-5 bg-hospital-50 border border-hospital-100 rounded-2xl space-y-6 animate-in fade-in slide-in-from-top-1">
                                   <div>
@@ -783,7 +770,6 @@ export const PackageTeamDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Follow Up Date Modal */}
       {showFollowUpDateModal && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -860,7 +846,6 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Primary Lost Reason Selection Modal */}
       {showLostModal && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-print">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 my-auto">
@@ -922,10 +907,9 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Final Confirmation Warning Modal for Lost Patients */}
       {showFinalLostConfirm && (
         <div className="fixed inset-0 z-[80] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 no-print">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-red-50">
+          <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-red-50">
             <div className="p-12 text-center space-y-10">
               <div className="relative inline-block">
                 <div className="absolute inset-0 animate-ping rounded-full bg-red-100 opacity-75"></div>
