@@ -145,7 +145,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </aside>
 
       <main className="flex-1 overflow-auto h-screen relative bg-[#f8fafc]">
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-4 md:p-10 max-w-[1600px]">
           {children}
         </div>
       </main>

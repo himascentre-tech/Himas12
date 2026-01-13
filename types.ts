@@ -32,7 +32,7 @@ export enum SurgeryProcedure {
   LaserPiles = 'Laser Piles',
   LaserPilonido = 'Laser Pilonidoplasty',
   LaserFistula = 'Laser Fistula + Perianal Abscess',
-  LaserFissure = 'Laser Fissure',
+  LaserLaserFissure = 'Laser Fissure',
   StaplerHaem = 'Stapler Haemorrhoidectomy',
   Others = 'Others',
 }
@@ -91,6 +91,18 @@ export interface PackageProposal {
   proposalCreatedAt: string;
   lastFollowUpAt?: string;
   outcomeDate?: string; // Date when surgery was fixed or lost (YYYY-MM-DD)
+  
+  // Surgery Package Details
+  paymentMode?: 'Cash' | 'Insurance Pending' | 'Insurance Accepted';
+  insuranceDocShared?: 'Yes' | 'No';
+  packageAmount?: number;
+  preOpInvestigation?: 'Included' | 'Excluded';
+  surgeryMedicines?: 'Included' | 'Excluded';
+  equipment?: string[]; // Meshes, Laparoscopic Items
+  icuCharges?: 'Included' | 'Excluded';
+  roomType?: 'Private' | 'Deluxe' | 'Semi';
+  stayDays?: number;
+  postOpFollowUp?: 'Included' | 'Excluded';
 }
 
 export interface StaffUser {
