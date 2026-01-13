@@ -29,22 +29,24 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBookingDate, setSelectedBookingDate] = useState('');
+  
+  const getTodayDate = () => new Date().toISOString().split('T')[0];
+  
+  // Defaulting Scheduled Booking date filter to today
+  const [selectedBookingDate, setSelectedBookingDate] = useState(getTodayDate());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [otherSourceDetail, setOtherSourceDetail] = useState('');
   
-  const [selectedHistoryDate, setSelectedHistoryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState(getTodayDate());
 
   const [revisitPatient, setRevisitPatient] = useState<Patient | null>(null);
   const [revisitData, setRevisitData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayDate(),
     time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   });
-
-  const getTodayDate = () => new Date().toISOString().split('T')[0];
 
   const getInitialFormData = (): Partial<Patient> => ({
     id: '', 
@@ -420,7 +422,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             <Timer className="w-4 h-4" /> OPD History
           </button>
           <button 
-            onClick={() => { setActiveTab('BOOKING'); setSearchTerm(''); setSelectedBookingDate(''); setActiveSubTab('BOOKING'); }} 
+            onClick={() => { setActiveTab('BOOKING'); setSearchTerm(''); setSelectedBookingDate(getTodayDate()); setActiveSubTab('BOOKING'); }} 
             className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all flex-shrink-0 ${activeTab === 'BOOKING' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <CalendarCheck className="w-4 h-4" /> Scheduled Bookings
@@ -547,9 +549,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                 />
                 {selectedBookingDate && (
                   <button 
-                    onClick={() => setSelectedBookingDate('')}
+                    onClick={() => setSelectedBookingDate(getTodayDate())}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
-                    title="Clear Date"
+                    title="Reset to Today"
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
@@ -742,7 +744,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                             onClick={() => {
                               setRevisitPatient(p);
                               setRevisitData({
-                                date: new Date().toISOString().split('T')[0],
+                                date: getTodayDate(),
                                 time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                               });
                             }} 
