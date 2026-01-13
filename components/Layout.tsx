@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus } from 'lucide-react';
@@ -87,7 +86,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
+      <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20 no-print">
         <div className="font-bold text-hospital-600 tracking-tighter text-xl">HiMAS</div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-slate-100 rounded-lg">
           {isSidebarOpen ? <X /> : <Menu />}
@@ -95,7 +94,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </div>
 
       <aside className={`
-        fixed inset-y-0 left-0 z-10 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-10 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out no-print
         md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -151,7 +150,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
       
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-0 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-0 md:hidden no-print" onClick={() => setIsSidebarOpen(false)} />
       )}
     </div>
   );

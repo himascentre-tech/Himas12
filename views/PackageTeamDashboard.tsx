@@ -317,109 +317,123 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Official Printable View - Matches 'PROPOSED TARIFF' Form */}
       {selectedPatient && (
-        <div className="hidden print:block p-8 bg-white min-h-screen text-slate-900 leading-tight" style={{ fontFamily: 'Times New Roman, serif' }}>
-          <div className="flex justify-between items-start mb-4">
+        <div className="hidden print:block p-10 bg-white min-h-screen text-slate-900 leading-tight" style={{ fontFamily: 'Times New Roman, serif' }}>
+          <div className="flex justify-between items-start mb-6">
             <img 
               src="https://xggnswfyegchwlplzvto.supabase.co/storage/v1/object/public/Himas/himas-file-1%20(4).webp" 
               alt="Himas Logo" 
-              className="w-48" 
+              className="w-56" 
             />
             <div className="text-right">
-              <h1 className="text-2xl font-black uppercase tracking-tight">PROPOSED TARIFF</h1>
-              <p className="text-base font-bold mt-1 uppercase">DATE: {today}</p>
+              <h1 className="text-3xl font-black uppercase tracking-tight border-b-4 border-slate-900 pb-1">PROPOSED TARIFF</h1>
+              <p className="text-lg font-bold mt-2 uppercase">DATE: {today}</p>
             </div>
           </div>
 
-          <table className="w-full border-2 border-slate-900 text-sm mb-6 table-fixed">
+          <table className="w-full border-2 border-slate-900 text-base mb-8 table-fixed">
             <tbody>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase w-1/3">PATIENT NAME</td>
-                <td className="border-2 border-slate-900 p-3 font-bold uppercase w-1/2">{selectedPatient.name}</td>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase w-1/6">INSURANCE</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase w-1/3 bg-slate-50/50">PATIENT NAME</td>
+                <td className="border-2 border-slate-900 p-4 font-bold uppercase w-1/2">{selectedPatient.name}</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase w-1/6 text-center">INSURANCE</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">AGE/SEX</td>
-                <td className="border-2 border-slate-900 p-3 font-bold">{selectedPatient.age} / {selectedPatient.gender}</td>
-                <td className="border-2 border-slate-900 p-3 flex justify-center items-center h-full">
-                  <div className="w-6 h-6 border-2 border-slate-900 flex items-center justify-center">
-                    {(proposal.paymentMode?.includes('Insurance')) && <div className="w-3 h-3 bg-slate-900" />}
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">AGE/SEX</td>
+                <td className="border-2 border-slate-900 p-4 font-bold">{selectedPatient.age} / {selectedPatient.gender}</td>
+                <td className="border-2 border-slate-900 p-4 flex justify-center items-center h-full">
+                  <div className="w-8 h-8 border-2 border-slate-900 flex items-center justify-center">
+                    {(proposal.paymentMode?.includes('Insurance')) && <div className="w-5 h-5 bg-slate-900" />}
                   </div>
                 </td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">UHID NO</td>
-                <td className="border-2 border-slate-900 p-3 font-bold font-mono text-base">{selectedPatient.id}</td>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase text-center">CASH</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">UHID NO</td>
+                <td className="border-2 border-slate-900 p-4 font-bold font-mono text-xl">{selectedPatient.id}</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase text-center">CASH</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">CONTACT NO</td>
-                <td className="border-2 border-slate-900 p-3 font-bold font-mono">{selectedPatient.mobile}</td>
-                <td className="border-2 border-slate-900 p-3 flex justify-center items-center h-full">
-                  <div className="w-6 h-6 border-2 border-slate-900 flex items-center justify-center">
-                    {proposal.paymentMode === 'Cash' && <div className="w-3 h-3 bg-slate-900" />}
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">CONTACT NO</td>
+                <td className="border-2 border-slate-900 p-4 font-bold font-mono">{selectedPatient.mobile}</td>
+                <td className="border-2 border-slate-900 p-4 flex justify-center items-center h-full">
+                  <div className="w-8 h-8 border-2 border-slate-900 flex items-center justify-center">
+                    {proposal.paymentMode === 'Cash' && <div className="w-5 h-5 bg-slate-900" />}
                   </div>
                 </td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">REFERRED BY</td>
-                <td className="border-2 border-slate-900 p-3 font-bold uppercase">{selectedPatient.sourceDoctorName || selectedPatient.source}</td>
-                <td className="border-2 border-slate-900 p-3" rowSpan={4}></td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">REFERRED BY</td>
+                <td className="border-2 border-slate-900 p-4 font-bold uppercase">{selectedPatient.sourceDoctorName || selectedPatient.source}</td>
+                <td className="border-2 border-slate-900 p-4" rowSpan={6}></td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">No of Days of Admission</td>
-                <td className="border-2 border-slate-900 p-3 font-bold">{proposal.stayDays || '____'} Days</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">No of Days of Admission</td>
+                <td className="border-2 border-slate-900 p-4 font-bold">{proposal.stayDays || '____'} Days</td>
               </tr>
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">PROPOSED SURGERY</td>
-                <td className="border-2 border-slate-900 p-3 font-bold uppercase">
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">PROPOSED SURGERY</td>
+                <td className="border-2 border-slate-900 p-4 font-bold uppercase">
                   {selectedPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
                     ? selectedPatient.doctorAssessment.otherSurgeryName 
                     : (selectedPatient.doctorAssessment?.surgeryProcedure || '________________')}
                 </td>
               </tr>
+              {proposal.paymentMode?.includes('Insurance') && (
+                <>
+                  <tr>
+                    <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">INSURANCE NAME</td>
+                    <td className="border-2 border-slate-900 p-4 font-bold uppercase">{selectedPatient.insuranceName || '________________'}</td>
+                  </tr>
+                  <tr>
+                    <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">DOCUMENTS SHARED</td>
+                    <td className="border-2 border-slate-900 p-4 font-bold uppercase">{proposal.insuranceDocShared || '________________'}</td>
+                  </tr>
+                </>
+              )}
               <tr>
-                <td className="border-2 border-slate-900 p-3 font-black uppercase">Proposed Package</td>
-                <td className="border-2 border-slate-900 p-3 font-black text-lg">₹ {proposal.packageAmount?.toLocaleString() || '________________'}</td>
+                <td className="border-2 border-slate-900 p-4 font-black uppercase bg-slate-50/50">Proposed Package</td>
+                <td className="border-2 border-slate-900 p-4 font-black text-2xl bg-slate-50">₹ {proposal.packageAmount?.toLocaleString() || '________________'}</td>
               </tr>
             </tbody>
           </table>
 
-          <div className="border-2 border-slate-900 p-4 mb-6 min-h-[80px]">
-            <p className="text-xs font-black uppercase mb-2">Hospital Remarks</p>
-            <p className="text-sm font-bold text-slate-700 italic">
-              Room Type: {proposal.roomType || 'N/A'} • ICU: {proposal.icuCharges || 'Excluded'} • Pre-Op: {proposal.preOpInvestigation || 'Excluded'}
+          <div className="border-2 border-slate-900 p-6 mb-8 min-h-[100px] relative">
+            <p className="text-xs font-black uppercase mb-4 opacity-40">Hospital Remarks & Facilities Selection</p>
+            <p className="text-base font-bold text-slate-800 leading-relaxed italic">
+              Selected Room: <span className="underline">{proposal.roomType || 'N/A'}</span> • ICU Status: <span className="underline">{proposal.icuCharges || 'Excluded'}</span> • Pre-Op Care: <span className="underline">{proposal.preOpInvestigation || 'Excluded'}</span> • Pharmacy: <span className="underline">{proposal.surgeryMedicines || 'Excluded'}</span>
+              <br />
+              <span className="mt-2 block">Equipment List: {proposal.equipment?.length ? proposal.equipment.join(', ') : 'Standard Items Only'}</span>
             </p>
           </div>
 
-          <div className="mb-8">
-            <h3 className="font-black underline uppercase mb-3">Terms and Conditions</h3>
-            <ol className="list-decimal list-inside space-y-2 text-sm font-bold">
-              <li>ICU Admission/Special Investigations/Special Injections/Special Consultation/Blood Transfusions - IF ANY - CHARGES EXTRA</li>
-              <li>Ward Charges for One Day (24 Hrs) - For Proposed Package (Bill Cycles)</li>
-              <li>ICU Admission - CHARGES EXTRA (without Ventilator - 15000/day AND with Ventilator - 25000/day)</li>
+          <div className="mb-10">
+            <h3 className="font-black underline uppercase mb-4 text-lg">Terms and Conditions</h3>
+            <ol className="list-decimal list-inside space-y-3 text-sm font-bold leading-snug">
+              <li>ICU Admission / Special Investigations / Special Injections / Special Consultation / Blood Transfusions - <span className="underline italic">IF ANY</span> - <span className="text-red-700">CHARGES EXTRA</span></li>
+              <li>Ward Charges for One Day (24 Hrs) - For Proposed Package (Based on standard Bill Cycles)</li>
+              <li>ICU Admission - <span className="uppercase text-red-700">CHARGES EXTRA</span> (without Ventilator - 15000/day AND with Ventilator - 25000/day)</li>
             </ol>
           </div>
 
-          <div className="bg-slate-50 border-l-8 border-slate-900 p-5 mb-10">
-            <p className="text-sm font-black mb-2">NOTE: Requested to pay Rs. 20,000 as advance for SURGERY DATE and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
-            <p className="text-base font-black uppercase tracking-widest text-center py-2 border-y-2 border-slate-900 mt-2">ABOVE PACKAGE IS NON-NEGOTIABLE</p>
+          <div className="bg-slate-50 border-l-[12px] border-slate-900 p-8 mb-12 shadow-sm">
+            <p className="text-base font-black mb-4">NOTE: Requested to pay <span className="text-xl underline">Rs. 20,000</span> as advance for SURGERY DATE confirmation and 50% of package amount TO BE CLEARED BEFORE SHIFTING TO OT</p>
+            <p className="text-xl font-black uppercase tracking-widest text-center py-4 border-y-2 border-slate-900 mt-4 bg-white">ABOVE PACKAGE IS NON-NEGOTIABLE</p>
           </div>
 
-          <div className="mt-24 flex justify-between px-4">
+          <div className="mt-32 flex justify-between px-6">
             <div className="text-center w-1/3">
-              <div className="border-b-2 border-slate-900 mb-4 h-12 flex items-end justify-center">
-                 <span className="text-xs font-mono opacity-20">COUNSELOR INITIALS</span>
+              <div className="border-b-2 border-slate-900 mb-4 h-16 flex items-end justify-center">
+                 <span className="text-[10px] font-mono opacity-10">OFFICIAL COUNSELOR STAMP</span>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest">Proposal explained by (Name and Signature)</p>
+              <p className="text-xs font-black uppercase tracking-widest">Proposal explained by<br/>(Name and Signature)</p>
             </div>
             <div className="text-center w-1/3">
-              <div className="border-b-2 border-slate-900 mb-4 h-12"></div>
-              <p className="text-[10px] font-black uppercase tracking-widest">SIGNATURE (Patient/Attender)</p>
+              <div className="border-b-2 border-slate-900 mb-4 h-16"></div>
+              <p className="text-xs font-black uppercase tracking-widest">SIGNATURE<br/>(Patient / Authorized Attender)</p>
             </div>
           </div>
           
-          <div className="mt-20 text-center opacity-30 text-[8px] uppercase font-black tracking-[0.4em]">
-            Official Handover Copy • Himas Hospital Management System • Verified {new Date().toLocaleDateString('en-IN')}
+          <div className="mt-24 text-center opacity-30 text-[9px] uppercase font-black tracking-[0.5em] border-t pt-4">
+            Official Patient Handover Copy • Himas Hospital Management System • Verified {new Date().toLocaleDateString('en-IN', {day: '2-digit', month: 'long', year: 'numeric'})}
           </div>
         </div>
       )}
@@ -605,7 +619,7 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
 
                             {/* Conditional Insurance Document Shared field */}
-                            {proposal.paymentMode === 'Insurance Pending' && (
+                            {proposal.paymentMode?.includes('Insurance') && (
                               <div className="mt-4 p-5 bg-hospital-50 border border-hospital-100 rounded-2xl animate-in fade-in slide-in-from-top-1">
                                 <label className="flex items-center gap-2 text-xs font-bold text-hospital-600 uppercase tracking-widest mb-4">
                                   <FileCheck className="w-4 h-4" /> Document Shared?
@@ -743,7 +757,7 @@ export const PackageTeamDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-8 border-t bg-slate-50/50 flex flex-wrap gap-4">
+                  <div className="p-8 border-t bg-slate-50/50 flex flex-wrap gap-4 no-print">
                      <button onClick={() => handleActionClick(ProposalStatus.FollowUp)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2.5 shadow-sm text-base">
                        <History className="w-6 h-6" /> Schedule Follow-up
                      </button>
@@ -756,7 +770,7 @@ export const PackageTeamDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-12 text-center bg-slate-50/20">
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-12 text-center bg-slate-50/20 no-print">
                   <div className="bg-white p-10 rounded-full border border-slate-100 shadow-sm mb-8">
                     <Briefcase className="w-24 h-24 text-hospital-400 opacity-20" />
                   </div>
@@ -775,6 +789,7 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Modals are already wrapped in no-print or logic that hides them during main UI rendering */}
       {/* Follow Up Date Modal */}
       {showFollowUpDateModal && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
