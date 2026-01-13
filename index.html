@@ -29,9 +29,17 @@
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
       }
-      .no-print {
-        @media print {
-          display: none;
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        @page {
+          margin: 0;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+          background-color: white !important;
         }
       }
     </style>
