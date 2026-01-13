@@ -31,33 +31,40 @@
         margin: 0;
       }
       @media print {
+        /* Hide non-print content */
         body * {
           visibility: hidden;
-          margin: 0 !important;
-          padding: 0 !important;
         }
+        
+        /* Specific print elements to show */
         .print-container, .print-container * {
-          visibility: visible;
+          visibility: visible !important;
         }
+
+        /* Fix container to start of printable area */
         .print-container {
           position: absolute;
           left: 0;
           top: 0;
           width: 100%;
-          margin: 0 !important;
-          padding: 20px !important;
-          visibility: visible !important;
+          display: block !important;
+          background: white !important;
         }
+
         .no-print {
           display: none !important;
         }
+
+        /* Define consistent page margins */
         @page {
-          margin: 0;
-          size: auto;
+          margin: 20mm;
+          size: A4 portrait;
         }
+
         html, body {
           height: auto;
           overflow: visible !important;
+          background: white !important;
         }
       }
     </style>

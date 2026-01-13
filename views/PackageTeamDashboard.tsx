@@ -309,6 +309,9 @@ export const PackageTeamDashboard: React.FC = () => {
   const printableRows = useMemo(() => {
     if (!currentPatient) return [];
     
+    const docAssessment = currentPatient.doctorAssessment;
+    const packageProp = currentPatient.packageProposal;
+
     const rows = [
       { label: 'PATIENT NAME', value: (currentPatient.name || 'N/A').toUpperCase() },
       { label: 'AGE / SEX', value: `${currentPatient.age || 0} / ${currentPatient.gender || 'N/A'}` },
@@ -317,15 +320,15 @@ export const PackageTeamDashboard: React.FC = () => {
       { label: 'REFERRED BY', value: (currentPatient.sourceDoctorName || currentPatient.source || 'N/A').toUpperCase() },
       { label: 'No of Days of Admission', value: `${proposal.stayDays || '____'} Days` },
       { label: 'PROPOSED SURGERY', value: (
-          (currentPatient.doctorAssessment?.surgeryProcedure === SurgeryProcedure.Others 
-            ? currentPatient.doctorAssessment?.otherSurgeryName 
-            : currentPatient.doctorAssessment?.surgeryProcedure) || '________________'
+          (docAssessment?.surgeryProcedure === SurgeryProcedure.Others 
+            ? docAssessment?.otherSurgeryName 
+            : docAssessment?.surgeryProcedure) || '________________'
         ).toUpperCase() },
       { label: 'MODE OF PAYMENT', value: proposal.paymentMode?.includes('Insurance') ? `INSURANCE (${(currentPatient.insuranceName || 'Not Specified').toUpperCase()})` : 'CASH' }
     ];
 
-    if (currentPatient.packageProposal?.status === ProposalStatus.SurgeryFixed && currentPatient.packageProposal?.outcomeDate) {
-      rows.push({ label: 'SCHEDULED SURGERY DATE', value: currentPatient.packageProposal.outcomeDate });
+    if (packageProp?.status === ProposalStatus.SurgeryFixed && packageProp?.outcomeDate) {
+      rows.push({ label: 'SCHEDULED SURGERY DATE', value: packageProp.outcomeDate });
     }
 
     return rows;
@@ -345,7 +348,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {/* Official Printable View - Redesigned for Lightweight Look */}
       {currentPatient && (
-        <div className="hidden print:block print-container p-10 bg-white min-h-screen text-slate-900 leading-[1.3]" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <div className="hidden print:block print-container p-4 bg-white min-h-screen text-slate-900 leading-[1.3]" style={{ fontFamily: 'Inter, sans-serif' }}>
           <div className="flex justify-between items-start mb-8">
             <img 
               src="https://xggnswfyegchwlplzvto.supabase.co/storage/v1/object/public/Himas/himas-file-1%20(4).webp" 
@@ -647,7 +650,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                             <div className="space-y-3">
-                              <label className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-widest">
+                              <label className="flex items-center gap-2 text-xs font-bold text-hospital-500 uppercase tracking-widest">
                                 <ClipboardCheck className="w-4 h-4 text-hospital-500" /> Pre-OP Investigation
                               </label>
                               <select className="w-full p-5 border-2 border-slate-100 rounded-xl font-bold text-slate-800 focus:border-hospital-500 outline-none text-base bg-slate-50/30" value={proposal.preOpInvestigation || ''} onChange={e => setProposal({ ...proposal, preOpInvestigation: e.target.value as any })}>
@@ -779,7 +782,7 @@ export const PackageTeamDashboard: React.FC = () => {
       {/* Follow Up Date Modal */}
       {showFollowUpDateModal && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-10 text-center space-y-8">
               <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
                 <History className="w-10 h-10" />
@@ -817,7 +820,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {showSurgeryDateModal && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 no-print">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-10 text-center space-y-8">
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                 <Calendar className="w-10 h-10" />
@@ -856,7 +859,7 @@ export const PackageTeamDashboard: React.FC = () => {
       {/* Primary Lost Reason Selection Modal */}
       {showLostModal && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-print">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 my-auto">
+          <div className="bg-white w-full max-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 my-auto">
             <div className="p-8 bg-red-50 border-b border-red-100 flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <XCircle className="w-8 h-8 text-red-600" />
@@ -918,7 +921,7 @@ export const PackageTeamDashboard: React.FC = () => {
       {/* Final Confirmation Warning Modal for Lost Patients */}
       {showFinalLostConfirm && (
         <div className="fixed inset-0 z-[80] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 no-print">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-red-50">
+          <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-red-50">
             <div className="p-12 text-center space-y-10">
               <div className="relative inline-block">
                 <div className="absolute inset-0 animate-ping rounded-full bg-red-100 opacity-75"></div>
