@@ -16,7 +16,7 @@ import {
 type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
 
 export const FrontOfficeDashboard: React.FC = () => {
-  const { patients, addPatient, updatePatient, deletePatient, refreshData, lastErrorMessage, clearError, activeSubTab, setActiveSubTab } = useHospital();
+  const { patients, addPatient, updatePatient, deletePatient, refreshData, lastErrorMessage, clearError, activeSubTab, setActiveSubTab, formatError } = useHospital();
   const [activeTab, setActiveTab] = useState<TabType>('HISTORY');
   const [showForm, setShowForm] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -54,7 +54,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     source: 'Google',
     sourceDoctorName: '',
     condition: Condition.Piles,
-    arrivalTime: null
+    arrivalTime: null,
+    bookingStatus: null // Ensure explicit null for registered patients
   });
 
   const [formData, setFormData] = useState<Partial<Patient>>(getInitialFormData());
@@ -83,7 +84,13 @@ export const FrontOfficeDashboard: React.FC = () => {
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
-      if (p.bookingStatus && p.bookingStatus !== BookingStatus.Arrived) return; 
+      // Logic: 
+      // 1. Registered patients (bookingStatus is null/empty) ALWAYS show in history if entry_date matches.
+      // 2. Bookings ONLY show if they have been marked as "Arrived".
+      const isRegistered = !p.bookingStatus;
+      const isArrived = p.bookingStatus === BookingStatus.Arrived;
+
+      if (!isRegistered && !isArrived) return; 
 
       if (p.entry_date === filterDate) {
         let timeDisplay = '--:--';
@@ -191,13 +198,14 @@ export const FrontOfficeDashboard: React.FC = () => {
         ...formData, 
         source: finalSource, 
         id: finalId,
-        bookingStatus: null,
+        bookingStatus: null, // Clear booking status to finalize registration
         arrivalTime: formData.arrivalTime || getCurrentTime()
       };
 
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
+          // Promote or update existing record
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         } else {
           await addPatient(submissionData as any);
@@ -209,8 +217,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       setShowForm(false);
       resetForm();
       setActiveTab('HISTORY');
+      setSelectedHistoryDate(getTodayDate()); // Auto-switch to today to see the new entry
     } catch (err: any) {
-      setLocalError(err.message || "Submission failed.");
+      const msg = formatError(err);
+      setLocalError(msg || "Submission failed. Please check your network or try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -256,7 +266,8 @@ export const FrontOfficeDashboard: React.FC = () => {
       setActiveTab('BOOKING');
       setActiveSubTab('BOOKING');
     } catch (err: any) {
-      setLocalError(err.message || "Booking failed.");
+      const msg = formatError(err);
+      setLocalError(msg || "Booking failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -269,14 +280,17 @@ export const FrontOfficeDashboard: React.FC = () => {
 
     try {
       await updatePatient({ ...patient, bookingStatus: nextStatus });
-    } catch (err) {
-      console.error("Status update error", err);
+    } catch (err: any) {
+      console.error("Status update error", formatError(err));
     }
   };
 
   const handleMarkArrivedAndRegister = async (patient: Patient) => {
+    setLocalError(null);
+    const nowTime = getCurrentTime();
+
     try {
-      const nowTime = getCurrentTime();
+      // 1. Sync arrival status to DB immediately if not already arrived
       if (patient.bookingStatus !== BookingStatus.Arrived) {
         await updatePatient({ 
           ...patient, 
@@ -285,6 +299,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         });
       }
 
+      // 2. Prepare form with data from booking
       let baseSource = patient.source;
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
@@ -297,18 +312,20 @@ export const FrontOfficeDashboard: React.FC = () => {
         name: patient.name,
         mobile: patient.mobile,
         source: baseSource,
-        entry_date: getTodayDate(), 
+        entry_date: getTodayDate(), // Registration is for TODAY
         condition: patient.condition,
         arrivalTime: nowTime,
-        id: '' 
+        id: '' // Assign new numeric/numeric-string ID
       });
       
-      setEditingId(patient.id); 
+      setEditingId(patient.id); // Reference old BOOK-XXX ID for the promote/update operation
       setOtherSourceDetail(detail);
       setStep(1);
       setShowForm(true);
-    } catch (err) {
-      console.error("Arrived check-in failed", err);
+    } catch (err: any) {
+      const msg = formatError(err);
+      console.error("Critical error in check-in handler", msg);
+      alert(`Check-in failed: ${msg}`);
     }
   };
 
@@ -330,7 +347,8 @@ export const FrontOfficeDashboard: React.FC = () => {
       setActiveTab('HISTORY');
       setSelectedHistoryDate(revisitData.date);
     } catch (err: any) {
-      setLocalError("Revisit update failed: " + err.message);
+      const msg = formatError(err);
+      setLocalError("Revisit update failed: " + msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -394,6 +412,21 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {lastErrorMessage && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+            <div className="text-xs font-bold text-red-700">
+              <span className="uppercase tracking-widest mr-2">System Error:</span>
+              {lastErrorMessage}
+            </div>
+          </div>
+          <button onClick={clearError} className="p-1 hover:bg-red-100 rounded-full transition-colors">
+            <X className="w-4 h-4 text-red-400" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Front Office</h2>
@@ -512,6 +545,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+                {historyOPDList.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">No OPD activity recorded for this date.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
