@@ -69,6 +69,14 @@ export enum BookingStatus {
   Arrived = 'Arrived',
 }
 
+export interface Prescription {
+  id: string;
+  name: string;
+  type: string;
+  data: string; // Base64 encoded file data
+  uploadedAt: string; // YYYY-MM-DD HH:mm
+}
+
 export interface DoctorAssessment {
   quickCode: SurgeonCode;
   surgeryProcedure?: SurgeryProcedure;
@@ -80,6 +88,7 @@ export interface DoctorAssessment {
   doctorSignature: string;
   notes?: string;
   assessedAt: string;
+  prescriptions?: Prescription[];
 }
 
 export interface PackageProposal {
