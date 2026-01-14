@@ -111,7 +111,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       lastFollowUpVisitDate: item.last_follow_up_visit_date || null,
       bookingStatus: item.booking_status as BookingStatus || null,
       bookingTime: item.booking_time || null,
-      followUpControl: item.follow_up_control || null
+      followUpControl: item.follow_up_control || null,
+      arrivalTime: item.arrival_time || null
     };
   };
 
@@ -138,7 +139,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       notes: p.doctorAssessment?.notes || null,
       booking_status: p.bookingStatus || null,
       booking_time: p.bookingTime || null,
-      follow_up_control: p.followUpControl || null
+      follow_up_control: p.followUpControl || null,
+      arrival_time: p.arrivalTime || null
     };
   };
 

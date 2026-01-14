@@ -1,3 +1,4 @@
+
 import { Patient, SurgeryProcedure, ProposalStatus, BookingStatus } from "../types";
 
 /**
@@ -34,7 +35,7 @@ export const syncToGoogleSheets = async (patient: Patient): Promise<boolean> => 
       booking_status: patient.bookingStatus || "N/A",
       booking_time: patient.bookingTime || "N/A",
       visit_type: visitType,
-      arrival_time: patient.created_at ? new Date(patient.created_at).toLocaleTimeString('en-IN') : "N/A",
+      arrival_time: patient.arrivalTime || (patient.created_at ? new Date(patient.created_at).toLocaleTimeString('en-IN') : "N/A"),
       
       // Clinical Assessment
       condition: patient.condition,

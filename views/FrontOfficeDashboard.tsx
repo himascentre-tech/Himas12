@@ -13,14 +13,6 @@ import {
   UserCheck, RotateCcw
 } from 'lucide-react';
 
-/**
- * SQL FIX FOR SUPABASE AGE CONSTRAINT:
- * If you encounter a "himas_data_age_check" violation, run this in your Supabase SQL Editor:
- * 
- * ALTER TABLE himas_data DROP CONSTRAINT IF EXISTS himas_data_age_check;
- * ALTER TABLE himas_data ADD CONSTRAINT himas_data_age_check CHECK (age >= 0);
- */
-
 type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
 
 export const FrontOfficeDashboard: React.FC = () => {
@@ -31,8 +23,8 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const getTodayDate = () => new Date().toISOString().split('T')[0];
+  const getCurrentTime = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   
-  // Defaulting Scheduled Booking date filter to today
   const [selectedBookingDate, setSelectedBookingDate] = useState(getTodayDate());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +37,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [revisitPatient, setRevisitPatient] = useState<Patient | null>(null);
   const [revisitData, setRevisitData] = useState({
     date: getTodayDate(),
-    time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    time: getCurrentTime()
   });
 
   const getInitialFormData = (): Partial<Patient> => ({
@@ -61,7 +53,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     insuranceName: '',
     source: 'Google',
     sourceDoctorName: '',
-    condition: Condition.Piles 
+    condition: Condition.Piles,
+    arrivalTime: null
   });
 
   const [formData, setFormData] = useState<Partial<Patient>>(getInitialFormData());
@@ -76,7 +69,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     condition: Condition.Piles,
   });
 
-  // Sync sidebar state with dashboard tabs
   useEffect(() => {
     if (activeSubTab === 'BOOKING') {
       setActiveTab('BOOKING');
@@ -91,12 +83,13 @@ export const FrontOfficeDashboard: React.FC = () => {
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
-      // RULE: Patients with any bookingStatus are not in the history ledger (Normal OPD workflow)
-      if (p.bookingStatus) return; 
+      if (p.bookingStatus && p.bookingStatus !== BookingStatus.Arrived) return; 
 
       if (p.entry_date === filterDate) {
         let timeDisplay = '--:--';
-        if (p.created_at) {
+        if (p.arrivalTime) {
+          timeDisplay = p.arrivalTime;
+        } else if (p.created_at) {
           try {
             const dateObj = new Date(p.created_at);
             if (!isNaN(dateObj.getTime())) {
@@ -138,7 +131,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         return matchesSearch && matchesDate;
       })
       .sort((a, b) => {
-        // Sort Arrived patients to the top
         if (a.bookingStatus === BookingStatus.Arrived && b.bookingStatus !== BookingStatus.Arrived) return -1;
         if (a.bookingStatus !== BookingStatus.Arrived && b.bookingStatus === BookingStatus.Arrived) return 1;
         return b.entry_date.localeCompare(a.entry_date);
@@ -164,8 +156,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please fill in Name, Mobile, and Age.");
       return;
     }
-    
-    // Validate conditional fields
     if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName?.trim()) {
       setLocalError("Please enter the Doctor's Name.");
       return;
@@ -178,7 +168,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       setLocalError("Please enter the Insurance Company Name.");
       return;
     }
-    
     setStep(2);
   };
 
@@ -189,7 +178,6 @@ export const FrontOfficeDashboard: React.FC = () => {
 
     const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
-    // Check for ID conflicts
     if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
@@ -199,12 +187,12 @@ export const FrontOfficeDashboard: React.FC = () => {
     try {
       const finalSource = formData.source === 'Other' ? `Other: ${otherSourceDetail}` : formData.source;
       
-      // RULE: Registration completion clears the booking status, promoting the record to the normal OPD queue
       const submissionData = { 
         ...formData, 
         source: finalSource, 
         id: finalId,
-        bookingStatus: null 
+        bookingStatus: null,
+        arrivalTime: formData.arrivalTime || getCurrentTime()
       };
 
       if (editingId) {
@@ -276,7 +264,6 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const cycleBookingStatus = async (patient: Patient) => {
     let nextStatus: BookingStatus;
-    // Cycle between OPD Fix and Follow-up (Scheduled)
     if (patient.bookingStatus === BookingStatus.OPDFix) nextStatus = BookingStatus.FollowUp;
     else nextStatus = BookingStatus.OPDFix;
 
@@ -289,12 +276,15 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleMarkArrivedAndRegister = async (patient: Patient) => {
     try {
-      // 1. Update status to Arrived in the database
+      const nowTime = getCurrentTime();
       if (patient.bookingStatus !== BookingStatus.Arrived) {
-        await updatePatient({ ...patient, bookingStatus: BookingStatus.Arrived });
+        await updatePatient({ 
+          ...patient, 
+          bookingStatus: BookingStatus.Arrived,
+          arrivalTime: nowTime 
+        });
       }
 
-      // 2. Trigger Registration Popup pre-filled with booking data
       let baseSource = patient.source;
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
@@ -309,10 +299,11 @@ export const FrontOfficeDashboard: React.FC = () => {
         source: baseSource,
         entry_date: getTodayDate(), 
         condition: patient.condition,
+        arrivalTime: nowTime,
         id: '' 
       });
       
-      setEditingId(patient.id); // Promoting the BOOK-XXXX ID via update
+      setEditingId(patient.id); 
       setOtherSourceDetail(detail);
       setStep(1);
       setShowForm(true);
@@ -745,7 +736,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                               setRevisitPatient(p);
                               setRevisitData({
                                 date: getTodayDate(),
-                                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                                time: getCurrentTime()
                               });
                             }} 
                             className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"
@@ -764,7 +755,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       ) : null}
 
-      {/* Booking Form Modal */}
       {showBookingForm && (
         <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
@@ -1024,7 +1014,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         ))}
                       </div>
 
-                      {/* Conditional Insurance Name Field */}
                       {formData.hasInsurance === 'Yes' && (
                         <div className="animate-in fade-in slide-in-from-top-2 pt-2">
                           <label className="block text-[10px] font-bold text-hospital-600 uppercase mb-2 tracking-widest flex items-center gap-2">
@@ -1062,7 +1051,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         ))}
                       </div>
 
-                      {/* Conditional Doctor's Name Field */}
                       {formData.source === 'Doctor Recommended' && (
                         <div className="animate-in fade-in slide-in-from-top-2 pt-2">
                           <label className="block text-[10px] font-bold text-hospital-600 uppercase mb-2 tracking-widest flex items-center gap-2">
@@ -1079,7 +1067,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Conditional Other Source Field */}
                       {formData.source === 'Other' && (
                         <div className="animate-in fade-in slide-in-from-top-2 pt-2">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Specify Other Source *</label>

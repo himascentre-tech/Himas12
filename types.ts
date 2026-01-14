@@ -137,4 +137,5 @@ export interface Patient {
   bookingStatus?: BookingStatus | null;
   bookingTime?: string | null;
   followUpControl?: string | null;
+  arrivalTime?: string | null;
 }
