@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
+import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure, Prescription } from '../types';
 import { 
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
   Download, User, Activity, 
@@ -9,7 +10,7 @@ import {
   DollarSign, Clock, XCircle, CheckCircle2,
   Globe, Loader2, CreditCard, Syringe, ClipboardCheck, BedDouble, Stethoscope as FollowUpIcon,
   FileCheck, ChevronLeft, ChevronRight as ChevronRightIcon,
-  ChevronDown, ChevronUp, AlertTriangle, CalendarDays
+  ChevronDown, ChevronUp, AlertTriangle, CalendarDays, FileText, Eye, File
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -255,6 +256,24 @@ export const PackageTeamDashboard: React.FC = () => {
     }
   };
 
+  const viewPrescription = (file: Prescription) => {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.title = file.name;
+      newWindow.document.body.style.margin = "0";
+      newWindow.document.body.style.display = "flex";
+      newWindow.document.body.style.justifyContent = "center";
+      newWindow.document.body.style.alignItems = "center";
+      newWindow.document.body.style.backgroundColor = "#f1f5f9";
+      
+      if (file.type.startsWith('image/')) {
+        newWindow.document.body.innerHTML = `<img src="${file.data}" style="max-width: 100%; max-height: 100vh; object-fit: contain; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" />`;
+      } else {
+        newWindow.document.body.innerHTML = `<iframe src="${file.data}" frameborder="0" style="border:0; width:100%; height:100vh;" allowfullscreen></iframe>`;
+      }
+    }
+  };
+
   const getMilestoneInfo = () => {
     if (!selectedPatient) return null;
     const status = selectedPatient.packageProposal?.status || ProposalStatus.Pending;
@@ -289,7 +308,7 @@ export const PackageTeamDashboard: React.FC = () => {
         date: outcomeDate, 
         icon: XCircle, 
         color: 'text-red-600', 
-        bg: 'bg-red-50',
+        bg: 'bg-red-50', 
         border: 'border-red-100'
       };
     }
@@ -441,7 +460,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 <button onClick={() => setCounselingFilter('PENDING')} className={`px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'PENDING' ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
                   <Clock className="w-3 md:w-4 h-3 md:h-4" /> New
                 </button>
-                <button onClick={() => setCounselingFilter('DUE_FOLLOWUPS')} className={`px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white'}`}>
+                <button onClick={() => setCounselingFilter('DUE_FOLLOWUPS')} className={`px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'DUE_FOLLOWUPS' ? 'bg-hospital-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
                   <Calendar className="w-3 md:w-4 h-3 md:h-4" /> Follow-ups
                 </button>
                 <button onClick={() => setCounselingFilter('CONVERTED')} className={`px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${counselingFilter === 'CONVERTED' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white'}`}>
@@ -570,6 +589,36 @@ export const PackageTeamDashboard: React.FC = () => {
                           </div>
                         ))}
                       </div>
+
+                      {/* Clinical Documents Section for Package Team */}
+                      {currentPatient.doctorAssessment?.prescriptions && currentPatient.doctorAssessment.prescriptions.length > 0 && (
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-2 border-l-4 border-hospital-600 pl-4 py-1">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Clinical Documents</h3>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {currentPatient.doctorAssessment.prescriptions.map((file) => (
+                              <button 
+                                key={file.id} 
+                                onClick={() => viewPrescription(file)}
+                                className="bg-white border-2 border-slate-50 rounded-2xl p-4 shadow-sm group hover:border-hospital-100 transition-all text-left flex items-center gap-3"
+                              >
+                                <div className="bg-hospital-50 p-2 rounded-lg text-hospital-600 flex-shrink-0 group-hover:bg-hospital-600 group-hover:text-white transition-colors">
+                                  <File className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 truncate" title={file.name}>{file.name}</p>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    <span className="text-[10px] font-medium text-slate-400">{file.uploadedAt}</span>
+                                  </div>
+                                </div>
+                                <Eye className="w-4 h-4 text-slate-300 ml-auto group-hover:text-hospital-500 transition-colors" />
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      )}
 
                       <section className="space-y-4">
                         <div className="flex items-center justify-between border-l-4 border-hospital-600 pl-3 md:pl-4 py-1">

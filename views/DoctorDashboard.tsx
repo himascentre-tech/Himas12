@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure, Prescription } from '../types';
-import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText, Plus, File, X, Trash2, Clock } from 'lucide-react';
+import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText, Plus, File, X, Trash2, Clock, Eye } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
@@ -79,7 +79,6 @@ export const DoctorDashboard: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Explicitly typing file as any to fix the 'unknown' type inference that causes name/type property errors
     Array.from(files).forEach((file: any) => {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -91,7 +90,6 @@ export const DoctorDashboard: React.FC = () => {
         
         const newPrescription: Prescription = {
           id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          // Fix: Accessing 'name' and 'type' on casted 'file' object
           name: file.name,
           type: file.type,
           data: base64String,
@@ -103,11 +101,9 @@ export const DoctorDashboard: React.FC = () => {
           prescriptions: [...(prev.prescriptions || []), newPrescription]
         }));
       };
-      // Fix: Casting file ensures it's treated as a Blob for readAsDataURL
       reader.readAsDataURL(file);
     });
     
-    // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -116,6 +112,24 @@ export const DoctorDashboard: React.FC = () => {
       ...prev,
       prescriptions: (prev.prescriptions || []).filter(p => p.id !== id)
     }));
+  };
+
+  const viewPrescription = (file: Prescription) => {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.title = file.name;
+      newWindow.document.body.style.margin = "0";
+      newWindow.document.body.style.display = "flex";
+      newWindow.document.body.style.justifyContent = "center";
+      newWindow.document.body.style.alignItems = "center";
+      newWindow.document.body.style.backgroundColor = "#f1f5f9";
+      
+      if (file.type.startsWith('image/')) {
+        newWindow.document.body.innerHTML = `<img src="${file.data}" style="max-width: 100%; max-height: 100vh; object-fit: contain; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" />`;
+      } else {
+        newWindow.document.body.innerHTML = `<iframe src="${file.data}" frameborder="0" style="border:0; width:100%; height:100vh;" allowfullscreen></iframe>`;
+      }
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -326,7 +340,6 @@ export const DoctorDashboard: React.FC = () => {
                 </div>
               </section>
 
-              {/* Prescription Uploads Section */}
               <section className="space-y-4">
                 <div className="flex items-center justify-between border-l-4 border-hospital-500 pl-4 py-1">
                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Prescription Uploads (Optional)</h3>
@@ -352,8 +365,12 @@ export const DoctorDashboard: React.FC = () => {
                     {assessment.prescriptions.map((file) => (
                       <div key={file.id} className="bg-white border-2 border-slate-50 rounded-2xl p-4 shadow-sm group hover:border-hospital-100 transition-all">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="bg-hospital-50 p-2 rounded-lg text-hospital-600 flex-shrink-0">
+                          <button 
+                            type="button"
+                            onClick={() => viewPrescription(file)}
+                            className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                          >
+                            <div className="bg-hospital-50 p-2 rounded-lg text-hospital-600 flex-shrink-0 group-hover:bg-hospital-600 group-hover:text-white transition-colors">
                               <File className="w-5 h-5" />
                             </div>
                             <div className="min-w-0">
@@ -363,15 +380,25 @@ export const DoctorDashboard: React.FC = () => {
                                 <span className="text-[10px] font-medium text-slate-400">{file.uploadedAt}</span>
                               </div>
                             </div>
-                          </div>
-                          <button 
-                            type="button" 
-                            onClick={() => removePrescription(file.id)}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            title="Remove file"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              type="button" 
+                              onClick={() => viewPrescription(file)}
+                              className="p-1.5 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-lg transition-all"
+                              title="View file"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => removePrescription(file.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="Remove file"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
