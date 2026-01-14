@@ -96,9 +96,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
     
-    let dbAssessment = null;
+    let doctorAssessment = null;
     try {
-      dbAssessment = typeof item.doctor_assessment === 'string' 
+      doctorAssessment = typeof item.doctor_assessment === 'string' 
         ? JSON.parse(item.doctor_assessment) 
         : item.doctor_assessment;
     } catch (e) { console.error("Parse error doctor_assessment", e); }
@@ -109,21 +109,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         ? JSON.parse(item.package_proposal) 
         : item.package_proposal;
     } catch (e) { console.error("Parse error package_proposal", e); }
-
-    // Unified extraction logic: handles both column-based and JSON-meta-based storage
-    const rawStatus = item.booking_status || dbAssessment?.__booking_status;
-    const bookingStatus = (rawStatus === null || rawStatus === undefined || rawStatus === '') ? null : (rawStatus as BookingStatus);
-    
-    const bookingTime = item.booking_time || dbAssessment?.__booking_time || null;
-    const arrivalTime = item.arrival_time || dbAssessment?.__arrival_time || null;
-    const followUpControl = item.follow_up_control || dbAssessment?.__follow_up_control || null;
-
-    // Clean the assessment object for the frontend model (remove metadata keys)
-    let doctorAssessment = null;
-    if (dbAssessment) {
-      const { __booking_status, __booking_time, __arrival_time, __follow_up_control, ...cleanAss } = dbAssessment;
-      doctorAssessment = Object.keys(cleanAss).length > 0 ? cleanAss : null;
-    }
 
     return {
       id: item.id,
@@ -145,23 +130,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       packageProposal: packageProposal || null,
       isFollowUpVisit: Boolean(item.is_follow_up),
       lastFollowUpVisitDate: item.last_follow_up_visit_date || null,
-      bookingStatus: bookingStatus,
-      bookingTime: bookingTime,
-      followUpControl: followUpControl,
-      arrivalTime: arrivalTime
+      bookingStatus: (item.booking_status === '' || item.booking_status === null) ? null : (item.booking_status as BookingStatus),
+      bookingTime: item.booking_time || null,
+      followUpControl: item.follow_up_control || null,
+      arrivalTime: item.arrival_time || null
     };
   };
 
   const mapPatientToDB = (p: any) => {
-    // Strategy: Bundle metadata to avoid PGRST204 (missing columns)
-    const assessmentPayload = {
-      ...(p.doctorAssessment || {}),
-      __booking_status: p.bookingStatus || null,
-      __booking_time: p.bookingTime || null,
-      __arrival_time: p.arrivalTime || null,
-      __follow_up_control: p.followUpControl || null
-    };
-
     return {
       id: p.id,
       hospital_id: p.hospital_id,
@@ -177,11 +153,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       source: p.source,
       source_doctor_name: p.sourceDoctorName || null,
       condition: p.condition,
-      doctor_assessment: assessmentPayload,
-      package_proposal: p.packageProposal === undefined || p.packageProposal === null ? null : p.packageProposal,
+      doctor_assessment: p.doctorAssessment || null,
+      package_proposal: p.packageProposal || null,
       is_follow_up: p.isFollowUpVisit === true,
       last_follow_up_visit_date: p.lastFollowUpVisitDate || null,
-      notes: p.doctorAssessment?.notes || null
+      notes: p.doctorAssessment?.notes || null,
+      booking_status: p.bookingStatus || null,
+      booking_time: p.bookingTime || null,
+      arrival_time: p.arrivalTime || null,
+      follow_up_control: p.followUpControl || null
     };
   };
 
@@ -269,7 +249,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const mapped = mapPatientFromDB(data);
       if (mapped) {
         setPatients(prev => {
-          // Filter out BOTH the old ID and the new ID to prevent duplicates during ID changes
           const filtered = prev.filter(p => p.id !== oldId && p.id !== targetId);
           return [mapped, ...filtered].sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
         });

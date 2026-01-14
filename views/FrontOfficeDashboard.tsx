@@ -55,7 +55,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     sourceDoctorName: '',
     condition: Condition.Piles,
     arrivalTime: null,
-    bookingStatus: null // Ensure explicit null for registered patients
+    bookingStatus: null 
   });
 
   const [formData, setFormData] = useState<Partial<Patient>>(getInitialFormData());
@@ -84,9 +84,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
-      // Logic: 
-      // 1. Registered patients (bookingStatus is null/empty) ALWAYS show in history if entry_date matches.
-      // 2. Bookings ONLY show if they have been marked as "Arrived".
+      // 1. Registered patients (bookingStatus is null)
+      // 2. Arrived bookings (waiting for registration)
       const isRegistered = !p.bookingStatus;
       const isArrived = p.bookingStatus === BookingStatus.Arrived;
 
@@ -198,14 +197,13 @@ export const FrontOfficeDashboard: React.FC = () => {
         ...formData, 
         source: finalSource, 
         id: finalId,
-        bookingStatus: null, // Clear booking status to finalize registration
+        bookingStatus: null, // Critical: Clear booking status to show in history
         arrivalTime: formData.arrivalTime || getCurrentTime()
       };
 
       if (editingId) {
         const original = patients.find(p => p.id === editingId);
         if (original) {
-          // Promote or update existing record
           await updatePatient({ ...original, ...submissionData as Patient }, editingId);
         } else {
           await addPatient(submissionData as any);
@@ -217,10 +215,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       setShowForm(false);
       resetForm();
       setActiveTab('HISTORY');
-      setSelectedHistoryDate(getTodayDate()); // Auto-switch to today to see the new entry
+      setSelectedHistoryDate(getTodayDate()); 
     } catch (err: any) {
       const msg = formatError(err);
-      setLocalError(msg || "Submission failed. Please check your network or try again.");
+      setLocalError(msg || "Submission failed. Please check connection.");
     } finally {
       setIsSubmitting(false);
     }
@@ -231,7 +229,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     setLocalError(null);
     
     if (!bookingData.name || !bookingData.mobile || !bookingData.source || !bookingData.entry_date || !bookingData.bookingTime) {
-      setLocalError("Patient Name, Phone, Source, Date, and Timing are mandatory.");
+      setLocalError("All fields are mandatory for bookings.");
       return;
     }
 
@@ -290,7 +288,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     const nowTime = getCurrentTime();
 
     try {
-      // 1. Sync arrival status to DB immediately if not already arrived
       if (patient.bookingStatus !== BookingStatus.Arrived) {
         await updatePatient({ 
           ...patient, 
@@ -299,7 +296,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         });
       }
 
-      // 2. Prepare form with data from booking
       let baseSource = patient.source;
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
@@ -312,19 +308,19 @@ export const FrontOfficeDashboard: React.FC = () => {
         name: patient.name,
         mobile: patient.mobile,
         source: baseSource,
-        entry_date: getTodayDate(), // Registration is for TODAY
+        entry_date: getTodayDate(), 
         condition: patient.condition,
         arrivalTime: nowTime,
-        id: '' // Assign new numeric/numeric-string ID
+        id: '' 
       });
       
-      setEditingId(patient.id); // Reference old BOOK-XXX ID for the promote/update operation
+      setEditingId(patient.id); 
       setOtherSourceDetail(detail);
       setStep(1);
       setShowForm(true);
     } catch (err: any) {
       const msg = formatError(err);
-      console.error("Critical error in check-in handler", msg);
+      console.error("Critical error in check-in", msg);
       alert(`Check-in failed: ${msg}`);
     }
   };
@@ -430,7 +426,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Front Office</h2>
-          <p className="text-gray-500 text-sm">Registry Operations & Daily OPD</p>
+          <p className="text-gray-500 text-sm">Registry Operations & Daily OPD Ledger</p>
         </div>
         <div className="flex bg-white rounded-2xl p-1.5 border shadow-sm max-w-full overflow-x-auto no-scrollbar">
           <button 
@@ -468,7 +464,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <Calendar className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 text-base">{isToday ? 'Today\'s OPD Ledger' : 'Historical OPD Ledger'}</h3>
+                <h3 className="font-bold text-slate-800 text-base">{isToday ? "Today's Ledger" : "Historical Ledger"}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <button onClick={() => shiftDate(-1)} className="p-1 hover:bg-white rounded-lg transition-colors"><ChevronLeft className="w-4 h-4 text-slate-400" /></button>
                   <input 
@@ -547,7 +543,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 ))}
                 {historyOPDList.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">No OPD activity recorded for this date.</td>
+                    <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">No activity recorded for this date.</td>
                   </tr>
                 )}
               </tbody>
@@ -996,7 +992,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                    <User className="w-8 h-8 text-hospital-600" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">{editingId ? 'Update Registry Profile' : 'New Patient Registration'}</h1>
+                  <h1 className="text-2xl font-bold text-slate-900">{editingId ? 'Update Profile' : 'New Registration'}</h1>
                   <p className="text-sm text-slate-400 font-medium">Step {step} of 2</p>
                 </div>
               </div>
