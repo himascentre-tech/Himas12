@@ -10,7 +10,8 @@ import {
   DollarSign, Clock, XCircle, CheckCircle2,
   Globe, Loader2, CreditCard, Syringe, ClipboardCheck, BedDouble, Stethoscope as FollowUpIcon,
   FileCheck, ChevronLeft, ChevronRight as ChevronRightIcon,
-  ChevronDown, ChevronUp, AlertTriangle, CalendarDays, FileText, Eye, File
+  ChevronDown, ChevronUp, AlertTriangle, CalendarDays, FileText, Eye, File,
+  Zap, HeartPulse, Wallet, Gauge, PenTool, ClipboardList
 } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -528,7 +529,6 @@ export const PackageTeamDashboard: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                    {filteredPatients.length === 0 && <div className="p-12 text-center text-slate-300 italic text-sm">No records match filters</div>}
                   </div>
                 )}
               </div>
@@ -590,11 +590,109 @@ export const PackageTeamDashboard: React.FC = () => {
                         ))}
                       </div>
 
-                      {/* Clinical Documents Section for Package Team */}
+                      {currentPatient.doctorAssessment && (
+                        <section className="space-y-4 animate-in fade-in duration-500">
+                          <div className="flex items-center gap-2 border-l-4 border-hospital-600 pl-4 py-1">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Physician's Clinical Validation</h3>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            <div className="lg:col-span-8 space-y-6">
+                              <div className="bg-white border-2 border-slate-100 rounded-3xl p-6 shadow-sm">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <FileText className="w-4 h-4 text-hospital-500" />
+                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Clinical Findings & Remarks</label>
+                                </div>
+                                <p className="text-sm text-slate-700 leading-relaxed italic whitespace-pre-wrap">
+                                  {currentPatient.doctorAssessment.notes || "No additional clinical remarks provided by the physician."}
+                                </p>
+                                
+                                <div className="mt-8 pt-6 border-t flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-slate-50 p-2 rounded-xl text-slate-400">
+                                      <PenTool className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Physician E-Signature</div>
+                                      <div className="text-lg font-serif italic font-bold text-slate-800 underline decoration-hospital-200">
+                                        {currentPatient.doctorAssessment.doctorSignature}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Assessed On</div>
+                                    <div className="text-[10px] font-mono font-bold text-slate-600">
+                                      {new Date(currentPatient.doctorAssessment.assessedAt).toLocaleString('en-IN')}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="lg:col-span-4 space-y-4">
+                              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                                <div className="space-y-5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <ClipboardList className="w-4 h-4 text-hospital-600" />
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Surgery Procedure</span>
+                                    </div>
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 uppercase tracking-widest text-right max-w-[150px] truncate">
+                                      {currentPatient.doctorAssessment.surgeryProcedure === SurgeryProcedure.Others 
+                                        ? currentPatient.doctorAssessment.otherSurgeryName 
+                                        : (currentPatient.doctorAssessment.surgeryProcedure || "N/A")}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Zap className="w-4 h-4 text-red-500" />
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pain Severity</span>
+                                    </div>
+                                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${currentPatient.doctorAssessment.painSeverity === 'High' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                                      {currentPatient.doctorAssessment.painSeverity}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Wallet className="w-4 h-4 text-emerald-500" />
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Affordability</span>
+                                    </div>
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 uppercase tracking-widest">
+                                      {currentPatient.doctorAssessment.affordability}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Gauge className="w-4 h-4 text-blue-500" />
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Conversion Readiness</span>
+                                    </div>
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 uppercase tracking-widest">
+                                      {currentPatient.doctorAssessment.conversionReadiness}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {currentPatient.doctorAssessment.tentativeSurgeryDate && (
+                                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-3">
+                                  <div className="bg-amber-600 p-2 rounded-xl text-white shadow-sm">
+                                    <Calendar className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <div className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Physician Preferred Date</div>
+                                    <div className="text-sm font-black text-amber-800">{currentPatient.doctorAssessment.tentativeSurgeryDate}</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </section>
+                      )}
+
                       {currentPatient.doctorAssessment?.prescriptions && currentPatient.doctorAssessment.prescriptions.length > 0 && (
                         <section className="space-y-4">
                           <div className="flex items-center gap-2 border-l-4 border-hospital-600 pl-4 py-1">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Clinical Documents</h3>
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Clinical Documents (Prescriptions)</h3>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {currentPatient.doctorAssessment.prescriptions.map((file) => (
