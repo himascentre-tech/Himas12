@@ -1,16 +1,18 @@
+
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading, activeSubTab, setActiveSubTab } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading, activeSubTab, setActiveSubTab, lastErrorMessage } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   useEffect(() => {
     if (isLoading) {
-      const timer = setTimeout(() => setShowTroubleshoot(true), 3000);
+      // Increased timeout to 8 seconds to handle potential database cold starts (Supabase free tier)
+      const timer = setTimeout(() => setShowTroubleshoot(true), 8000);
       return () => clearTimeout(timer);
     } else {
       setShowTroubleshoot(false);
@@ -62,22 +64,38 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="w-24 h-24 border-4 border-slate-100 border-t-hospital-600 rounded-full animate-spin"></div>
           <Activity className="absolute inset-0 m-auto w-10 h-10 text-hospital-600 animate-pulse" />
         </div>
-        <div className="text-slate-800 font-bold text-2xl tracking-tight mb-2">Synchronizing Hospital Data</div>
-        <p className="text-slate-400 text-sm max-w-xs text-center mb-8">Connecting to secure clinical database...</p>
+        <div className="text-slate-800 font-bold text-2xl tracking-tight mb-2">
+          {lastErrorMessage ? "Sync Interrupted" : "Synchronizing Hospital Data"}
+        </div>
+        <p className="text-slate-400 text-sm max-w-xs text-center mb-8">
+          {lastErrorMessage ? "A communication error occurred while fetching records." : "Connecting to secure clinical database..."}
+        </p>
         
-        {showTroubleshoot && (
-          <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm max-w-md w-full">
+        {lastErrorMessage && (
+          <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl max-w-md w-full">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <div className="text-xs font-bold text-red-700 break-all">{lastErrorMessage}</div>
+            </div>
+          </div>
+        )}
+
+        {(showTroubleshoot || lastErrorMessage) && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm max-w-md w-full">
             <div className="text-amber-600 font-bold text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Connection slow
+              <AlertCircle className="w-4 h-4" /> {lastErrorMessage ? "Connection failed" : "Connection is taking longer than usual"}
             </div>
             <div className="flex flex-wrap gap-2 justify-center w-full">
                <button onClick={() => window.location.reload()} className="flex-1 bg-white text-slate-700 px-4 py-3 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
-                 <RefreshCw className="w-3 h-3" /> Refresh
+                 <RefreshCw className="w-3 h-3" /> Retry Sync
                </button>
                <button onClick={forceStopLoading} className="flex-1 bg-hospital-600 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all">
-                 Enter Anyway
+                 Enter Dashboard
                </button>
             </div>
+            <p className="text-[10px] text-slate-400 text-center px-4 italic">
+              Note: The database may take up to 30 seconds to wake up if it has been inactive.
+            </p>
           </div>
         )}
       </div>
