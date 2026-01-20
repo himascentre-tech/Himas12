@@ -21,6 +21,7 @@ interface HospitalContextType {
   saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
   lastSavedAt: Date | null;
   refreshData: () => Promise<void>;
+  prewarmDatabase: () => Promise<void>;
   isLoading: boolean;
   isStaffLoaded: boolean;
   lastErrorMessage: string | null;
@@ -46,7 +47,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [activeSubTab, setActiveSubTab] = useState<string>('DASHBOARD');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // Default to false, let loadData trigger it
+  const [isLoading, setIsLoading] = useState(false); 
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
@@ -73,36 +74,40 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!e) return "Unknown error occurred";
     if (typeof e === 'string') return e;
     
+    if (e.message?.includes('Failed to fetch') || e.message?.includes('connection timeout') || e.message?.includes('Connection terminated')) {
+      return "Cloud sync interrupted (Database Sleep). Retrying automatically...";
+    }
+    
     const parts = [];
     if (e.message) parts.push(e.message);
     if (e.details) parts.push(`Details: ${e.details}`);
-    if (e.hint) parts.push(`Hint: ${e.hint}`);
     if (e.code) parts.push(`Code: ${e.code}`);
     
     if (parts.length > 0) return parts.join(" | ");
-    
-    if (e.error?.message) return e.error.message;
-    if (e.data?.message) return e.data.message;
-    
+    return String(e);
+  }, []);
+
+  // Updated prewarm to use a lightweight RPC if available
+  const prewarmDatabase = useCallback(async () => {
     try {
-      const str = JSON.stringify(e);
-      if (str === '{}' || str === '[]') return String(e);
-      return str;
-    } catch {
-      return String(e);
+      // Try to call the ping function first, falls back to lightweight query
+      const { error } = await supabase.rpc('ping_db');
+      if (error) {
+        await supabase.from('himas_data').select('id', { count: 'exact', head: true }).limit(1);
+      }
+    } catch (e) {
+      // Silent catch
     }
   }, []);
 
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
-    
     let doctorAssessment = null;
     try {
       doctorAssessment = typeof item.doctor_assessment === 'string' 
         ? JSON.parse(item.doctor_assessment) 
         : item.doctor_assessment;
     } catch (e) { console.error("Parse error doctor_assessment", e); }
-      
     let packageProposal = null;
     try {
       packageProposal = typeof item.package_proposal === 'string' 
@@ -161,7 +166,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       booking_status: p.bookingStatus || null,
       booking_time: p.bookingTime || null,
       arrival_time: p.arrivalTime || null,
-      follow_up_control: p.followUpControl || null
+      follow_up_control: p.follow_up_control || null
     };
   };
 
@@ -212,9 +217,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setLastErrorMessage(null);
     } catch (e: any) {
       const msg = formatError(e);
-      console.error("Data Loading Error:", msg, e);
-      setLastErrorMessage(msg);
-      setSaveStatus('error');
+      if (!isBackground && msg.includes("Retrying")) {
+         setTimeout(() => loadData(), 1200);
+      } else {
+         setLastErrorMessage(msg);
+         setSaveStatus('error');
+      }
     } finally {
       if (!isBackground) setIsLoading(false);
     }
@@ -254,13 +262,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
-      
       setSaveStatus('saved');
     } catch (err: any) {
       const msg = formatError(err);
       setLastErrorMessage(msg);
       setSaveStatus('error');
-      console.error("Update Patient Error:", msg, err);
       throw err;
     }
   };
@@ -287,7 +293,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           const msg = formatError(err);
           setLastErrorMessage(msg);
           setSaveStatus('error');
-          console.error("Add Patient Error:", msg, err);
           throw err;
         }
       },
@@ -318,6 +323,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       getPatientById: (id) => patients.find(p => p.id === id),
       staffUsers, registerStaff: async () => {},
       saveStatus, lastSavedAt, refreshData: () => loadData(), 
+      prewarmDatabase,
       isLoading, isStaffLoaded: true, lastErrorMessage, clearError,
       forceStopLoading, formatError
     }}>

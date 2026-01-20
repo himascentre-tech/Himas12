@@ -1,22 +1,24 @@
 
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus, Database } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading, activeSubTab, setActiveSubTab, lastErrorMessage } = useHospital();
+  const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading, forceStopLoading, activeSubTab, setActiveSubTab, lastErrorMessage, clearError } = useHospital();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
+    let timer: number;
     if (isLoading) {
-      // Increased timeout to 8 seconds to handle potential database cold starts (Supabase free tier)
-      const timer = setTimeout(() => setShowTroubleshoot(true), 8000);
-      return () => clearTimeout(timer);
+      timer = window.setTimeout(() => setShowTroubleshoot(true), 6000);
     } else {
       setShowTroubleshoot(false);
+      setIsRetrying(false);
     }
+    return () => clearTimeout(timer);
   }, [isLoading]);
 
   const handleLogout = async () => {
@@ -25,6 +27,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       setCurrentUserRole(null);
     } catch (error) {
       setCurrentUserRole(null);
+    }
+  };
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    clearError();
+    try {
+      await refreshData();
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -60,42 +72,66 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white p-6">
-        <div className="relative mb-8">
+        <div className="relative mb-10">
           <div className="w-24 h-24 border-4 border-slate-100 border-t-hospital-600 rounded-full animate-spin"></div>
           <Activity className="absolute inset-0 m-auto w-10 h-10 text-hospital-600 animate-pulse" />
         </div>
-        <div className="text-slate-800 font-bold text-2xl tracking-tight mb-2">
-          {lastErrorMessage ? "Sync Interrupted" : "Synchronizing Hospital Data"}
+        
+        <div className="text-center space-y-3 mb-10">
+          <h2 className="text-slate-800 font-bold text-2xl tracking-tight">
+            {lastErrorMessage ? "Sync Interrupted" : (showTroubleshoot ? "Waking Secure Database..." : "Synchronizing Hospital Data")}
+          </h2>
+          <p className="text-slate-400 text-sm max-w-xs mx-auto">
+            {lastErrorMessage 
+              ? "A communication error occurred while fetching records." 
+              : "Connecting to secure clinical database... This may take up to 30 seconds if the system has been inactive."}
+          </p>
         </div>
-        <p className="text-slate-400 text-sm max-w-xs text-center mb-8">
-          {lastErrorMessage ? "A communication error occurred while fetching records." : "Connecting to secure clinical database..."}
-        </p>
         
         {lastErrorMessage && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl max-w-md w-full">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <div className="text-xs font-bold text-red-700 break-all">{lastErrorMessage}</div>
+          <div className="mb-8 p-5 bg-red-50 border border-red-100 rounded-2xl max-w-md w-full shadow-sm animate-in fade-in zoom-in-95">
+            <div className="flex gap-4">
+              <div className="bg-red-500 p-1.5 rounded-lg h-fit mt-0.5">
+                <AlertCircle className="w-4 h-4 text-white" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] font-black text-red-400 uppercase tracking-widest">Network Error Trace</div>
+                <div className="text-xs font-bold text-red-700 leading-relaxed break-all">{lastErrorMessage}</div>
+              </div>
             </div>
           </div>
         )}
 
         {(showTroubleshoot || lastErrorMessage) && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm max-w-md w-full">
-            <div className="text-amber-600 font-bold text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> {lastErrorMessage ? "Connection failed" : "Connection is taking longer than usual"}
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-5 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-xl max-w-md w-full relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-amber-400" />
+            
+            <div className="flex items-center gap-3 text-amber-700 font-black text-xs uppercase tracking-widest">
+              <Database className="w-4 h-4" /> 
+              {lastErrorMessage ? "Connection Refused" : "Cold Start Detected"}
             </div>
-            <div className="flex flex-wrap gap-2 justify-center w-full">
-               <button onClick={() => window.location.reload()} className="flex-1 bg-white text-slate-700 px-4 py-3 rounded-xl text-xs font-bold border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
-                 <RefreshCw className="w-3 h-3" /> Retry Sync
+            
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+               <button 
+                 onClick={handleRetry} 
+                 disabled={isRetrying}
+                 className="flex-1 bg-white text-slate-700 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50"
+               >
+                 {isRetrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                 Retry Sync
                </button>
-               <button onClick={forceStopLoading} className="flex-1 bg-hospital-600 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all">
-                 Enter Dashboard
+               <button 
+                 onClick={forceStopLoading} 
+                 className="flex-1 bg-hospital-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all"
+               >
+                 Enter Offline
                </button>
             </div>
-            <p className="text-[10px] text-slate-400 text-center px-4 italic">
-              Note: The database may take up to 30 seconds to wake up if it has been inactive.
-            </p>
+            
+            <div className="p-3 bg-white/50 rounded-xl border border-white text-[10px] text-slate-500 text-center leading-relaxed">
+              <span className="font-bold block mb-1">PRO TIP</span>
+              Free database instances enter "Hibernation" during inactivity. Manual retry triggers an immediate wake signal.
+            </div>
           </div>
         )}
       </div>
