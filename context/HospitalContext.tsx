@@ -46,7 +46,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [activeSubTab, setActiveSubTab] = useState<string>('DASHBOARD');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Default to false, let loadData trigger it
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
@@ -223,7 +223,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (currentUserRole) {
       loadData();
-      pollingInterval.current = window.setInterval(() => loadData(true), 20000);
+      pollingInterval.current = window.setInterval(() => loadData(true), 25000);
     } else {
       setIsLoading(false);
     }

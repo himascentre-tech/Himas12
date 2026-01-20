@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Gender, Condition, Patient, ProposalStatus, BookingStatus } from '../types';
+import { syncToGoogleSheets } from '../services/googleSheetsService';
 import { 
   PlusCircle, Search, CheckCircle, Clock, 
   Pencil, User, Loader2, Calendar, 
@@ -10,7 +11,7 @@ import {
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
   Globe, UserPlus, ShieldCheck, Shield, BookmarkPlus, CalendarCheck,
-  UserCheck, RotateCcw, FileSpreadsheet, Download
+  UserCheck, RotateCcw, FileSpreadsheet, Download, Share2, ExternalLink
 } from 'lucide-react';
 
 type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
@@ -28,7 +29,6 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [selectedBookingDate, setSelectedBookingDate] = useState(getTodayDate());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Fix: Initialize with null to avoid "Block-scoped variable 'localError' used before its declaration"
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [otherSourceDetail, setOtherSourceDetail] = useState('');
@@ -41,6 +41,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [bookingReportEnd, setBookingReportEnd] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState<string>('ALL');
   const [bookingSourceFilter, setBookingSourceFilter] = useState<string>('ALL');
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
   const [revisitPatient, setRevisitPatient] = useState<Patient | null>(null);
   const [revisitData, setRevisitData] = useState({
@@ -149,13 +150,19 @@ export const FrontOfficeDashboard: React.FC = () => {
       });
   }, [patients, searchTerm, selectedBookingDate]);
 
-  const handleExportBookingsCSV = () => {
+  const getFilteredBookings = () => {
     let filtered = patients.filter(p => !!p.bookingStatus);
 
     if (bookingReportStart) filtered = filtered.filter(p => p.entry_date >= bookingReportStart);
     if (bookingReportEnd) filtered = filtered.filter(p => p.entry_date <= bookingReportEnd);
     if (bookingStatusFilter !== 'ALL') filtered = filtered.filter(p => p.bookingStatus === bookingStatusFilter);
     if (bookingSourceFilter !== 'ALL') filtered = filtered.filter(p => p.source === bookingSourceFilter);
+
+    return filtered;
+  };
+
+  const handleExportBookingsCSV = () => {
+    const filtered = getFilteredBookings();
 
     const headers = ['Booking ID', 'Patient Name', 'Mobile', 'Scheduled Date', 'Preferred Time', 'Condition', 'Source', 'Status'];
     const rows = filtered.map(p => [
@@ -169,16 +176,46 @@ export const FrontOfficeDashboard: React.FC = () => {
       p.bookingStatus
     ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    // Adding UTF-8 BOM to ensure Excel opens it correctly as an editable spreadsheet
+    const BOM = '\uFEFF';
+    const csvContent = BOM + [headers.join(','), ...rows].join('\n');
+    
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `scheduled_bookings_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `scheduled_bookings_report_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     setShowBookingFilters(false);
+  };
+
+  const handleSyncBookingsToSheets = async () => {
+    const filtered = getFilteredBookings();
+    if (filtered.length === 0) {
+      alert("No bookings found for the selected filters.");
+      return;
+    }
+
+    if (!confirm(`Sync ${filtered.length} filtered bookings to Google Sheets? This will update the online spreadsheet.`)) return;
+
+    setIsBulkSyncing(true);
+    let successCount = 0;
+    
+    try {
+      // Loop through filtered data and sync each to Google Sheets
+      for (const patient of filtered) {
+        const success = await syncToGoogleSheets(patient);
+        if (success) successCount++;
+      }
+      alert(`Sync Complete! ${successCount} bookings pushed to Google Sheets successfully.`);
+    } catch (err) {
+      alert("Sync failed. Please check your internet connection.");
+    } finally {
+      setIsBulkSyncing(false);
+      setShowBookingFilters(false);
+    }
   };
 
   useEffect(() => {
@@ -589,7 +626,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                     
                     <div className="space-y-4">
                       <div>
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Booking Date Range</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Scheduled Date Range</label>
                         <div className="grid grid-cols-2 gap-2">
                           <input type="date" value={bookingReportStart} onChange={e => setBookingReportStart(e.target.value)} className="w-full text-[10px] p-2 bg-slate-50 border rounded-lg font-bold" />
                           <input type="date" value={bookingReportEnd} onChange={e => setBookingReportEnd(e.target.value)} className="w-full text-[10px] p-2 bg-slate-50 border rounded-lg font-bold" />
@@ -603,7 +640,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Booking Source</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Lead Source</label>
                         <select value={bookingSourceFilter} onChange={e => setBookingSourceFilter(e.target.value)} className="w-full text-xs p-2 bg-slate-50 border rounded-lg font-bold">
                           <option value="ALL">All Sources</option>
                           {sources.map(s => <option key={s} value={s}>{s}</option>)}
@@ -611,12 +648,24 @@ export const FrontOfficeDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <button 
-                      onClick={handleExportBookingsCSV}
-                      className="w-full py-4 bg-hospital-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-hospital-100"
-                    >
-                      <FileSpreadsheet className="w-4 h-4" /> Export Bookings CSV
-                    </button>
+                    <div className="space-y-2 pt-2">
+                      <button 
+                        onClick={handleExportBookingsCSV}
+                        className="w-full py-4 bg-hospital-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-hospital-100"
+                      >
+                        <FileSpreadsheet className="w-4 h-4" /> Download CSV (Excel Ready)
+                      </button>
+                      
+                      <button 
+                        onClick={handleSyncBookingsToSheets}
+                        disabled={isBulkSyncing}
+                        className="w-full py-4 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 disabled:opacity-50"
+                      >
+                        {isBulkSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Share2 className="w-4 h-4" />} 
+                        Sync to Google Sheets
+                      </button>
+                    </div>
+
                     <button onClick={() => {setBookingReportStart(''); setBookingReportEnd(''); setBookingStatusFilter('ALL'); setBookingSourceFilter('ALL');}} className="w-full py-2 text-[9px] font-bold text-slate-400 hover:text-hospital-600 transition-colors uppercase border border-dashed rounded-lg">Clear Filters</button>
                  </div>
                )}
