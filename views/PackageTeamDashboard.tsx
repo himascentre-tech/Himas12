@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure, Prescription } from '../types';
+import { Patient, PackageProposal, SurgeonCode, ProposalStatus, SurgeryProcedure } from '../types';
 import { 
   Briefcase, Calendar, Wand2, Users, Trophy, History, X, 
   Download, User, Activity, 
@@ -254,24 +254,6 @@ export const PackageTeamDashboard: React.FC = () => {
       setProposal({ ...proposal, equipment: current.filter(i => i !== item) });
     } else {
       setProposal({ ...proposal, equipment: [...current, item] });
-    }
-  };
-
-  const viewPrescription = (file: Prescription) => {
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.title = file.name;
-      newWindow.document.body.style.margin = "0";
-      newWindow.document.body.style.display = "flex";
-      newWindow.document.body.style.justifyContent = "center";
-      newWindow.document.body.style.alignItems = "center";
-      newWindow.document.body.style.backgroundColor = "#f1f5f9";
-      
-      if (file.type.startsWith('image/')) {
-        newWindow.document.body.innerHTML = `<img src="${file.data}" style="max-width: 100%; max-height: 100vh; object-fit: contain; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" />`;
-      } else {
-        newWindow.document.body.innerHTML = `<iframe src="${file.data}" frameborder="0" style="border:0; width:100%; height:100vh;" allowfullscreen></iframe>`;
-      }
     }
   };
 
@@ -685,35 +667,6 @@ export const PackageTeamDashboard: React.FC = () => {
                                 </div>
                               )}
                             </div>
-                          </div>
-                        </section>
-                      )}
-
-                      {currentPatient.doctorAssessment?.prescriptions && currentPatient.doctorAssessment.prescriptions.length > 0 && (
-                        <section className="space-y-4">
-                          <div className="flex items-center gap-2 border-l-4 border-hospital-600 pl-4 py-1">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Clinical Documents (Prescriptions)</h3>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {currentPatient.doctorAssessment.prescriptions.map((file) => (
-                              <button 
-                                key={file.id} 
-                                onClick={() => viewPrescription(file)}
-                                className="bg-white border-2 border-slate-50 rounded-2xl p-4 shadow-sm group hover:border-hospital-100 transition-all text-left flex items-center gap-3"
-                              >
-                                <div className="bg-hospital-50 p-2 rounded-lg text-hospital-600 flex-shrink-0 group-hover:bg-hospital-600 group-hover:text-white transition-colors">
-                                  <File className="w-5 h-5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-slate-800 truncate" title={file.name}>{file.name}</p>
-                                  <div className="flex items-center gap-1.5 mt-1">
-                                    <Clock className="w-3 h-3 text-slate-400" />
-                                    <span className="text-[10px] font-medium text-slate-400">{file.uploadedAt}</span>
-                                  </div>
-                                </div>
-                                <Eye className="w-4 h-4 text-slate-300 ml-auto group-hover:text-hospital-500 transition-colors" />
-                              </button>
-                            ))}
                           </div>
                         </section>
                       )}

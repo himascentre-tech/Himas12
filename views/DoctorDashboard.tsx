@@ -1,14 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure, Prescription } from '../types';
-import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText, Plus, File, X, Trash2, Clock, Eye } from 'lucide-react';
+import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
+import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText, X, Clock, Eye } from 'lucide-react';
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [assessment, setAssessment] = useState<Partial<DoctorAssessment>>({
     quickCode: undefined,
@@ -20,7 +19,6 @@ export const DoctorDashboard: React.FC = () => {
     tentativeSurgeryDate: '',
     doctorSignature: '',
     notes: '',
-    prescriptions: []
   });
 
   useEffect(() => {
@@ -29,7 +27,6 @@ export const DoctorDashboard: React.FC = () => {
         setAssessment({
           ...selectedPatient.doctorAssessment,
           notes: selectedPatient.doctorAssessment.notes || '',
-          prescriptions: selectedPatient.doctorAssessment.prescriptions || []
         });
       } else {
         setAssessment({
@@ -42,7 +39,6 @@ export const DoctorDashboard: React.FC = () => {
           tentativeSurgeryDate: '',
           doctorSignature: '',
           notes: '',
-          prescriptions: []
         });
       }
     }
@@ -72,63 +68,6 @@ export const DoctorDashboard: React.FC = () => {
         affordability: undefined,
         conversionReadiness: undefined
       });
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file: any) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64String = event.target?.result as string;
-        const now = new Date();
-        const timestamp = now.toISOString().split('T')[0] + ' ' + 
-                         now.getHours().toString().padStart(2, '0') + ':' + 
-                         now.getMinutes().toString().padStart(2, '0');
-        
-        const newPrescription: Prescription = {
-          id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: file.name,
-          type: file.type,
-          data: base64String,
-          uploadedAt: timestamp
-        };
-
-        setAssessment(prev => ({
-          ...prev,
-          prescriptions: [...(prev.prescriptions || []), newPrescription]
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removePrescription = (id: string) => {
-    setAssessment(prev => ({
-      ...prev,
-      prescriptions: (prev.prescriptions || []).filter(p => p.id !== id)
-    }));
-  };
-
-  const viewPrescription = (file: Prescription) => {
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.title = file.name;
-      newWindow.document.body.style.margin = "0";
-      newWindow.document.body.style.display = "flex";
-      newWindow.document.body.style.justifyContent = "center";
-      newWindow.document.body.style.alignItems = "center";
-      newWindow.document.body.style.backgroundColor = "#f1f5f9";
-      
-      if (file.type.startsWith('image/')) {
-        newWindow.document.body.innerHTML = `<img src="${file.data}" style="max-width: 100%; max-height: 100vh; object-fit: contain; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" />`;
-      } else {
-        newWindow.document.body.innerHTML = `<iframe src="${file.data}" frameborder="0" style="border:0; width:100%; height:100vh;" allowfullscreen></iframe>`;
-      }
     }
   };
 
@@ -338,77 +277,6 @@ export const DoctorDashboard: React.FC = () => {
                     onChange={e => setAssessment({...assessment, notes: e.target.value})}
                   />
                 </div>
-              </section>
-
-              <section className="space-y-4">
-                <div className="flex items-center justify-between border-l-4 border-hospital-500 pl-4 py-1">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Prescription Uploads (Optional)</h3>
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-[10px] font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md active:scale-95 uppercase tracking-widest"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Prescription
-                  </button>
-                  <input 
-                    type="file" 
-                    multiple 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept=".pdf,image/png,image/jpeg,image/jpg" 
-                    onChange={handleFileUpload}
-                  />
-                </div>
-
-                {assessment.prescriptions && assessment.prescriptions.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {assessment.prescriptions.map((file) => (
-                      <div key={file.id} className="bg-white border-2 border-slate-50 rounded-2xl p-4 shadow-sm group hover:border-hospital-100 transition-all">
-                        <div className="flex items-start justify-between gap-3">
-                          <button 
-                            type="button"
-                            onClick={() => viewPrescription(file)}
-                            className="flex items-center gap-3 min-w-0 flex-1 text-left"
-                          >
-                            <div className="bg-hospital-50 p-2 rounded-lg text-hospital-600 flex-shrink-0 group-hover:bg-hospital-600 group-hover:text-white transition-colors">
-                              <File className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-800 truncate" title={file.name}>{file.name}</p>
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                <span className="text-[10px] font-medium text-slate-400">{file.uploadedAt}</span>
-                              </div>
-                            </div>
-                          </button>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              type="button" 
-                              onClick={() => viewPrescription(file)}
-                              className="p-1.5 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-lg transition-all"
-                              title="View file"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button 
-                              type="button" 
-                              onClick={() => removePrescription(file.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                              title="Remove file"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center">
-                    <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                    <p className="text-xs font-medium text-slate-400 italic">No prescriptions uploaded yet.</p>
-                  </div>
-                )}
               </section>
 
               <section className="pt-8 border-t border-slate-100">
