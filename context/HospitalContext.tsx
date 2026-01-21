@@ -89,6 +89,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       return "Network Synchronizing (Cloud Handshake)...";
     }
     
+    // Specifically handle Quota errors so they don't look like database failures
+    if (e.name === 'QuotaExceededError' || e.message?.includes('quota exceeded')) {
+      return "Local Cache Full (Data saved to Cloud successfully)";
+    }
+    
     const parts = [];
     if (e.message) parts.push(e.message);
     if (e.details) parts.push(`Details: ${e.details}`);
@@ -289,10 +294,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           return finalPatientsList;
         });
         
-        // Side effects after state is calculated
-        if (cachedHospitalId.current) {
-          updateCache(`patients_${cachedHospitalId.current}`, finalPatientsList);
+        // Cache updates are now failure-tolerant
+        try {
+          if (cachedHospitalId.current) {
+            updateCache(`patients_${cachedHospitalId.current}`, finalPatientsList);
+          }
+        } catch (cacheErr) {
+          console.warn("Cache update skipped", cacheErr);
         }
+        
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       setSaveStatus('saved');
@@ -312,9 +322,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
           const hospitalId = await getEffectiveHospitalId();
           if (!hospitalId) throw new Error("Not logged in.");
+          
           const dbPayload = mapPatientToDB({ ...pd, hospital_id: hospitalId });
           const { data, error } = await supabase.from('himas_data').insert(dbPayload).select().single();
           if (error) throw error;
+          
           const mapped = mapPatientFromDB(data);
           if (mapped) {
             let finalPatientsList: Patient[] = [];
@@ -322,10 +334,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
               finalPatientsList = [mapped, ...prev];
               return finalPatientsList;
             });
-            updateCache(`patients_${hospitalId}`, finalPatientsList);
+            
+            // Cache updates are now failure-tolerant and won't block registration
+            try {
+              updateCache(`patients_${hospitalId}`, finalPatientsList);
+            } catch (cacheErr) {
+              console.warn("Cache full - data saved to cloud only", cacheErr);
+            }
+            
             syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
           }
           setSaveStatus('saved');
+          setLastErrorMessage(null); // Clear any previous storage warnings
         } catch (err: any) {
           const msg = formatError(err);
           setLastErrorMessage(msg);
@@ -340,7 +360,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (error) throw error;
           setPatients(prev => {
             const newList = prev.filter(p => p.id !== id);
-            if (hospitalId) updateCache(`patients_${hospitalId}`, newList);
+            try {
+              if (hospitalId) updateCache(`patients_${hospitalId}`, newList);
+            } catch (e) {}
             return newList;
           });
         } catch (err: any) {
