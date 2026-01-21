@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
-import { TestUpload } from '../components/TestUpload';
 import { Gender, Condition, Patient, ProposalStatus, BookingStatus } from '../types';
 import { syncToGoogleSheets } from '../services/googleSheetsService';
 import { 
@@ -637,11 +636,11 @@ export const FrontOfficeDashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-4 w-full xl:w-3/4">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input type="text" placeholder="Search bookings by name or phone..." className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-medium text-slate-700" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Search bookings by name or phone..." className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-medium text-slate-700" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
               <div className="relative w-full md:w-64">
                 <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-hospital-500 w-5 h-5" />
-                <input type="date" className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-bold text-slate-700 appearance-none bg-white" value={selectedBookingDate} onChange={e => setSelectedBookingDate(e.target.value)} />
+                <input type="date" className="w-full pl-12 pr-10 py-3.5 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-hospital-50 focus:border-hospital-500 outline-none transition-all font-bold text-slate-700 appearance-none bg-white" value={selectedBookingDate} onChange={e => setSelectedBookingDate(e.target.value)} />
                 {selectedBookingDate && <button onClick={() => setSelectedBookingDate(getTodayDate())} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400" title="Reset to Today"><RotateCcw className="w-4 h-4" /></button>}
               </div>
             </div>
@@ -786,47 +785,42 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
-                    <tr>
-                      <th className="px-6 py-4">File ID</th>
-                      <th className="px-6 py-4">Patient Profile</th>
-                      <th className="px-6 py-4">Original DOP</th>
-                      <th className="px-6 py-4">Contact</th>
-                      <th className="px-6 py-4 text-center">Lifecycle Actions</th>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                  <tr>
+                    <th className="px-6 py-4">File ID</th>
+                    <th className="px-6 py-4">Patient Profile</th>
+                    <th className="px-6 py-4">Original DOP</th>
+                    <th className="px-6 py-4">Contact</th>
+                    <th className="px-6 py-4 text-center">Lifecycle Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredArchive.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="px-6 py-4"><span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2.5 py-1.5 rounded-lg border border-hospital-100">{p.id}</span></td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900 group-hover:text-hospital-700 transition-colors">{p.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-medium">{p.age}y • {p.gender}</span>
+                            <span className="w-1 h-1 rounded-full bg-slate-200" />
+                            <span className="text-[10px] text-hospital-500 font-bold">{p.condition}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Calendar className="w-3.5 h-3.5 text-hospital-500" />{p.entry_date}</div></td>
+                      <td className="px-6 py-4"><div className="flex items-center gap-2 text-sm font-mono font-bold text-slate-700"><Phone className="w-3.5 h-3.5 text-hospital-500" />{p.mobile}</div></td>
+                      <td className="px-6 py-4"><div className="flex items-center justify-center gap-3"><button onClick={() => { setRevisitPatient(p); setRevisitData({ date: getTodayDate(), time: getCurrentTime() }); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"><History className="w-3.5 h-3.5" /> Log Revisit</button><button onClick={() => handleEdit(p)} className="p-2 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"><Pencil className="w-4 h-4" /></button></div></td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredArchive.map(p => (
-                      <tr key={p.id} className="hover:bg-slate-50/30 transition-colors group">
-                        <td className="px-6 py-4"><span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2.5 py-1.5 rounded-lg border border-hospital-100">{p.id}</span></td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-slate-900 group-hover:text-hospital-700 transition-colors">{p.name}</div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                             <span className="text-[10px] text-slate-400 font-medium">{p.age}y • {p.gender}</span>
-                             <span className="w-1 h-1 rounded-full bg-slate-200" />
-                             <span className="text-[10px] text-hospital-500 font-bold">{p.condition}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Calendar className="w-3.5 h-3.5 text-hospital-500" />{p.entry_date}</div></td>
-                        <td className="px-6 py-4"><div className="flex items-center gap-2 text-sm font-mono font-bold text-slate-700"><Phone className="w-3.5 h-3.5 text-hospital-500" />{p.mobile}</div></td>
-                        <td className="px-6 py-4"><div className="flex items-center justify-center gap-3"><button onClick={() => { setRevisitPatient(p); setRevisitData({ date: getTodayDate(), time: getCurrentTime() }); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"><History className="w-3.5 h-3.5" /> Log Revisit</button><button onClick={() => handleEdit(p)} className="p-2 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"><Pencil className="w-4 h-4" /></button></div></td>
-                      </tr>
-                    ))}
-                    {filteredArchive.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic font-medium">No records found matching search criteria.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="lg:col-span-1">
-              <TestUpload />
+                  ))}
+                  {filteredArchive.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic font-medium">No records found matching search criteria.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

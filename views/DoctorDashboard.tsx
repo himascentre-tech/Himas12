@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment, SurgeryProcedure } from '../types';
 import { Stethoscope, Check, User, Activity, Briefcase, Loader2, ShieldCheck, ClipboardList, Edit3, History, FileText, X, Clock, Eye } from 'lucide-react';
-import { BlobUploader } from "./BlobUploader";
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment, lastErrorMessage } = useHospital();
@@ -192,10 +192,6 @@ export const DoctorDashboard: React.FC = () => {
             </div>
             
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-10">
-              <section className="space-y-4">
-                <BlobUploader />
-              </section>
-
               <section className="space-y-6">
                 <div className="flex items-center gap-2 border-l-4 border-hospital-500 pl-4 py-1">
                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Clinical Recommendation</h3>
