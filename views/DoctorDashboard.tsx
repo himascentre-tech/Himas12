@@ -41,7 +41,13 @@ export const DoctorDashboard: React.FC = () => {
     }
   }, [selectedPatient]);
 
-  const awaitingAssessment = patients.filter(p => !p.doctorAssessment && (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm)));
+  const awaitingAssessment = patients.filter(p => {
+    const s = searchTerm.toLowerCase();
+    const nameMatch = (p.name || '').toLowerCase().includes(s);
+    const idMatch = (p.id || '').toLowerCase().includes(s);
+    return !p.doctorAssessment && (nameMatch || idMatch);
+  });
+
   const completedAssessment = patients.filter(p => !!p.doctorAssessment).slice(0, 15);
 
   const handleSave = async () => {
@@ -55,16 +61,16 @@ export const DoctorDashboard: React.FC = () => {
       } as DoctorAssessment;
       
       await updateDoctorAssessment(selectedPatient.id, assessment);
-      setSelectedPatient(null); // Return to empty state after save
+      setSelectedPatient(null); 
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] gap-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-120px)] gap-6 overflow-hidden">
       {/* Left Sidebar: Clinical Queue */}
-      <div className="w-80 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="w-80 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden z-[20]">
         <div className="p-5 border-b border-slate-100 bg-white">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -73,14 +79,14 @@ export const DoctorDashboard: React.FC = () => {
               </div>
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Clinical Queue ({awaitingAssessment.length})</h2>
             </div>
-            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{patients.filter(p => !!p.doctorAssessment).length} Completed</span>
+            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{patients.filter(p => !!p.doctorAssessment).length} Done</span>
           </div>
           
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" />
             <input 
               type="text"
-              placeholder="Search patients..."
+              placeholder="Locate patient..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] focus:ring-2 focus:ring-hospital-500/20 outline-none font-medium"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -88,16 +94,17 @@ export const DoctorDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
           {/* Active Queue */}
-          <div className="divide-y divide-slate-50">
-            {awaitingAssessment.map(patient => (
-              <button 
-                key={patient.id}
-                onClick={() => setSelectedPatient(patient)}
-                className={`w-full p-5 text-left transition-all relative group ${selectedPatient?.id === patient.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
-              >
-                {selectedPatient?.id === patient.id && <div className="absolute inset-y-0 left-0 w-1 bg-hospital-600" />}
+          {awaitingAssessment.map(patient => (
+            <button 
+              key={patient.id}
+              type="button"
+              onClick={() => setSelectedPatient(patient)}
+              className={`w-full p-5 text-left transition-all relative group cursor-pointer block border-none outline-none ${selectedPatient?.id === patient.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
+            >
+              {selectedPatient?.id === patient.id && <div className="absolute inset-y-0 left-0 w-1 bg-hospital-600" />}
+              <div className="pointer-events-none">
                 <div className="flex justify-between items-start mb-1">
                   <div className="font-black text-slate-800 text-[11px] tracking-tight uppercase">{patient.name}</div>
                   <div className="text-[8px] font-black text-slate-300">{patient.id.slice(-6)}</div>
@@ -107,44 +114,43 @@ export const DoctorDashboard: React.FC = () => {
                   <span className="text-[9px] font-black text-hospital-500 uppercase tracking-widest">{patient.condition}</span>
                   {patient.isFollowUpVisit && (
                     <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest flex items-center gap-0.5">
-                      <Clock className="w-2 h-2" /> Revisit
+                      <Clock className="w-2 h-2" /> REVISIT
                     </span>
                   )}
                 </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Recently Seen */}
-          {completedAssessment.length > 0 && (
-            <div className="mt-4 pb-10">
-              <div className="px-5 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50/50">Recently Seen</div>
-              <div className="divide-y divide-slate-50">
-                {completedAssessment.map(patient => (
-                  <button 
-                    key={patient.id} 
-                    onClick={() => setSelectedPatient(patient)}
-                    className={`w-full p-5 flex items-center justify-between group transition-all ${selectedPatient?.id === patient.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
-                  >
-                    <div className="text-left">
-                      <div className="font-bold text-slate-600 text-[11px] uppercase group-hover:text-hospital-600 transition-colors">{patient.name}</div>
-                      <div className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">{patient.condition} • {patient.doctorAssessment?.quickCode.split(' - ')[0]}</div>
-                    </div>
-                    <Check className={`w-3 h-3 ${selectedPatient?.id === patient.id ? 'text-hospital-500' : 'text-emerald-500'}`} />
-                  </button>
-                ))}
               </div>
+            </button>
+          ))}
+
+          {/* Recently Seen Section */}
+          {completedAssessment.length > 0 && (
+            <div className="bg-slate-50/30">
+              <div className="px-5 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50/50">Evaluated Today</div>
+              {completedAssessment.map(patient => (
+                <button 
+                  key={patient.id} 
+                  type="button"
+                  onClick={() => setSelectedPatient(patient)}
+                  className={`w-full p-5 flex items-center justify-between group transition-all border-none outline-none cursor-pointer ${selectedPatient?.id === patient.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
+                >
+                  <div className="text-left pointer-events-none">
+                    <div className="font-bold text-slate-600 text-[11px] uppercase group-hover:text-hospital-600 transition-colors">{patient.name}</div>
+                    <div className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">{patient.condition} • {patient.doctorAssessment?.quickCode?.split(' - ')[0]}</div>
+                  </div>
+                  <Check className={`w-3 h-3 pointer-events-none ${selectedPatient?.id === patient.id ? 'text-hospital-500' : 'text-emerald-500'}`} />
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
 
       {/* Main Content: Physician Workstation */}
-      <div className="flex-1 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
+      <div className="flex-1 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative z-[10]">
         {selectedPatient ? (
           <>
             {/* Active Clinical Entry Header */}
-            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-hospital-50 rounded-2xl flex items-center justify-center text-hospital-600">
                   <User className="w-6 h-6" />
@@ -157,41 +163,41 @@ export const DoctorDashboard: React.FC = () => {
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setSelectedPatient(null)}
-                className="p-2 hover:bg-slate-100 rounded-xl text-slate-300 hover:text-slate-500 transition-all"
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-300 hover:text-slate-500 transition-all cursor-pointer border-none bg-transparent"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
-              {/* Section 1: Clinical Findings */}
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="w-4 h-4 text-hospital-500" />
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Clinical Findings & Notes</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Clinical Findings & Assessment</h3>
                 </div>
                 <textarea 
                   className="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-medium focus:border-hospital-500 focus:ring-4 focus:ring-hospital-500/5 outline-none transition-all placeholder:text-slate-300"
-                  placeholder="Record patient complaints, examination findings, and medical history..."
+                  placeholder="Record symptoms, examination details, and medical context..."
                   value={assessmentForm.notes}
                   onChange={(e) => setAssessmentForm({...assessmentForm, notes: e.target.value})}
                 />
               </section>
 
-              {/* Section 2: Surgical Recommendation */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                 <div className="space-y-6">
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-hospital-500" />
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Surgical Recommendation</h3>
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Path of Care</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {[SurgeonCode.M1, SurgeonCode.S1].map(code => (
                       <button 
                         key={code}
+                        type="button"
                         onClick={() => setAssessmentForm({...assessmentForm, quickCode: code})}
-                        className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center ${
+                        className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 text-center cursor-pointer ${
                           assessmentForm.quickCode === code 
                           ? 'border-hospital-600 bg-hospital-50/50 shadow-lg shadow-hospital-100' 
                           : 'border-slate-100 hover:border-slate-200 text-slate-400'
@@ -222,14 +228,15 @@ export const DoctorDashboard: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex items-center gap-2">
                       <Thermometer className="w-4 h-4 text-orange-500" />
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Pain & Readiness</h3>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Symptom Intensity</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       {Object.values(PainSeverity).map(lvl => (
                         <button 
                           key={lvl}
+                          type="button"
                           onClick={() => setAssessmentForm({...assessmentForm, painSeverity: lvl})}
-                          className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                          className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
                             assessmentForm.painSeverity === lvl ? 'bg-orange-500 border-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
                           }`}
                         >
@@ -248,8 +255,9 @@ export const DoctorDashboard: React.FC = () => {
                       {Object.values(ConversionReadiness).map(cr => (
                         <button 
                           key={cr}
+                          type="button"
                           onClick={() => setAssessmentForm({...assessmentForm, conversionReadiness: cr})}
-                          className={`py-3 px-4 rounded-xl text-[9px] font-bold text-left border transition-all ${
+                          className={`py-3 px-4 rounded-xl text-[9px] font-bold text-left border transition-all cursor-pointer ${
                             assessmentForm.conversionReadiness === cr ? 'bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
                           }`}
                         >
@@ -262,23 +270,22 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
+            <div className="p-8 border-t border-slate-100 bg-slate-50/40 flex items-center justify-between no-print">
               <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                <Info className="w-3.5 h-3.5" /> Assessment for {selectedPatient.condition}
+                <Info className="w-3.5 h-3.5" /> Re-evaluating {selectedPatient.condition}
               </div>
               <button 
+                type="button"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center gap-3 px-12 py-4 bg-hospital-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-hospital-700 transition-all shadow-xl shadow-hospital-100 active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-3 px-12 py-4 bg-hospital-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-hospital-700 transition-all shadow-xl shadow-hospital-100 active:scale-95 disabled:opacity-50 cursor-pointer border-none"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {selectedPatient.doctorAssessment ? 'Update Clinical Record' : 'Submit Clinical Assessment'}
+                {selectedPatient.doctorAssessment ? 'Update Record' : 'Commit Assessment'}
               </button>
             </div>
           </>
         ) : (
-          /* Placeholder State */
           <div className="flex-1 flex flex-col items-center justify-center text-center p-20 animate-in fade-in duration-700">
             <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 border border-slate-50 shadow-[0_0_50px_rgba(14,165,233,0.05)]">
               <div className="w-24 h-24 rounded-full border-4 border-hospital-50 border-t-hospital-500 flex items-center justify-center relative">
@@ -289,7 +296,7 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Physician Workstation Ready</h2>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.4em]">SELECT A PATIENT PROFILE TO BEGIN CLINICAL RE-EVALUATION</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.4em]">SELECT A PATIENT RECORD TO BEGIN CLINICAL ASSESSMENT</p>
           </div>
         )}
       </div>

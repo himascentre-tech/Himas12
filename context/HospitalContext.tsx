@@ -25,6 +25,7 @@ interface HospitalContextType {
   refreshData: (force?: boolean) => Promise<void>;
   prewarmDatabase: () => Promise<void>;
   isLoading: boolean;
+  isInitialLoading: boolean;
   isStaffLoaded: boolean;
   lastErrorMessage: string | null;
   clearError: () => void;
@@ -76,6 +77,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [patients, setPatients] = useState<Patient[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(false); 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
@@ -91,20 +93,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
     
-    // Ensure nested objects are handled correctly if they come back as empty strings/objects
-    const doctorAssessment = (item.doctor_assessment && Object.keys(item.doctor_assessment).length > 0) 
+    const doctorAssessment = (item.doctor_assessment && typeof item.doctor_assessment === 'object' && Object.keys(item.doctor_assessment).length > 0) 
       ? (item.doctor_assessment as DoctorAssessment) 
       : null;
-    const packageProposal = (item.package_proposal && Object.keys(item.package_proposal).length > 0) 
+    const packageProposal = (item.package_proposal && typeof item.package_proposal === 'object' && Object.keys(item.package_proposal).length > 0) 
       ? (item.package_proposal as PackageProposal) 
       : null;
 
     return {
       id: item.id,
-      hospital_id: item.hospital_id,
-      name: item.name,
+      hospital_id: item.hospital_id || '',
+      name: item.name || 'Unknown Patient',
       dob: item.dob || null,
-      entry_date: item.entry_date || null,
+      entry_date: item.entry_date || new Date().toISOString().split('T')[0],
       gender: item.gender || 'Other',
       age: Number(item.age) || 0,
       mobile: item.mobile || '',
@@ -114,7 +115,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       source: item.source || 'Other',
       sourceDoctorName: item.source_doctor_name || '',
       condition: item.condition || 'Other',
-      created_at: item.created_at,
+      created_at: item.created_at || new Date().toISOString(),
       doctorAssessment,
       packageProposal,
       isFollowUpVisit: Boolean(item.is_follow_up),
@@ -141,7 +142,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!isBackground) setIsLoading(true);
     try {
       const hospitalId = await getEffectiveHospitalId();
-      if (!hospitalId) return;
+      if (!hospitalId) {
+        setIsInitialLoading(false);
+        return;
+      }
       const cacheKey = `patients_${hospitalId}`;
       if (force) invalidateCache(cacheKey);
 
@@ -153,7 +157,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             .select(PATIENT_FIELDS)
             .eq('hospital_id', hospitalId)
             .order('entry_date', { ascending: false })
-            .range(0, 99); // Increased range for better dashboard visibility
+            .range(0, 99);
           if (error) throw error;
           return data;
         },
@@ -168,7 +172,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setLastErrorMessage(formatError(e));
       setSaveStatus('error');
     } finally {
-      if (!isBackground) setIsLoading(false);
+      if (!isBackground) {
+        setIsLoading(false);
+        setIsInitialLoading(false);
+      }
     }
   }, [formatError]);
 
@@ -247,6 +254,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (role) {
           sessionStorage.setItem(STORAGE_KEY_ROLE, role);
           setActiveSubTab('DASHBOARD');
+          setIsInitialLoading(true);
         } else {
           sessionStorage.removeItem(STORAGE_KEY_ROLE);
           setPatients([]);
@@ -289,8 +297,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       prewarmDatabase: async () => {
         await supabase.from('himas_data').select('id', { count: 'exact', head: true }).limit(1);
       },
-      isLoading, isStaffLoaded: true, lastErrorMessage, clearError: () => setLastErrorMessage(null),
-      forceStopLoading: () => setIsLoading(false),
+      isLoading, isInitialLoading, isStaffLoaded: true, lastErrorMessage, clearError: () => setLastErrorMessage(null),
+      forceStopLoading: () => { setIsLoading(false); setIsInitialLoading(false); },
       formatError
     }}>
       {children}

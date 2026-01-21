@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -30,21 +31,18 @@
         background-color: #f8fafc;
         margin: 0;
       }
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+      
       @media print {
-        /* Hide everything by default using visibility */
-        body * {
-          visibility: hidden;
-        }
-        
-        /* Show print-container and its entire subtree */
-        .print-container, 
-        .print-container * {
+        body * { visibility: hidden; }
+        .print-container, .print-container * {
           visibility: visible !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
-
-        /* Reset the container to take over the whole page */
         .print-container {
           position: absolute;
           left: 0;
@@ -53,26 +51,12 @@
           display: block !important;
           background: white !important;
         }
-
-        /* Fully remove no-print items from the flow */
-        .no-print {
-          display: none !important;
-          visibility: hidden !important;
-        }
-
-        @page {
-          margin: 15mm;
-          size: A4 portrait;
-        }
-
-        html, body {
-          height: auto;
-          overflow: visible !important;
-          background: white !important;
-        }
+        .no-print { display: none !important; visibility: hidden !important; }
+        @page { margin: 15mm; size: A4 portrait; }
+        html, body { height: auto; overflow: visible !important; background: white !important; }
       }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
@@ -81,15 +65,15 @@
     "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19.0.0",
     "@google/genai": "https://esm.sh/@google/genai@1.33.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@vercel/blob": "https://esm.sh/@vercel/blob@0.27.1",
+    "vite": "https://esm.sh/vite@^7.3.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vercel/blob": "https://esm.sh/@vercel/blob@0.27.1"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

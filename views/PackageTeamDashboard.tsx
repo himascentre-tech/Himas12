@@ -45,8 +45,13 @@ export const PackageTeamDashboard: React.FC = () => {
   }, [selectedPatient]);
 
   const surgeryReadyPatients = patients.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.mobile.includes(searchTerm) || p.id.includes(searchTerm);
-    const isSurgical = p.doctorAssessment && p.doctorAssessment.quickCode.includes('S1');
+    const s = searchTerm.toLowerCase();
+    const nameMatch = (p.name || '').toLowerCase().includes(s);
+    const mobileMatch = (p.mobile || '').toLowerCase().includes(s);
+    const idMatch = (p.id || '').toLowerCase().includes(s);
+    const matchesSearch = nameMatch || mobileMatch || idMatch;
+
+    const isSurgical = p.doctorAssessment && (p.doctorAssessment.quickCode || '').includes('S1');
     const currentStatus = p.packageProposal?.status || ProposalStatus.Pending;
     
     if (queueFilter === 'PENDING') return isSurgical && currentStatus === ProposalStatus.Pending && matchesSearch;
