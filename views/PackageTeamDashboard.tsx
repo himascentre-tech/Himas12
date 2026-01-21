@@ -45,11 +45,13 @@ export const PackageTeamDashboard: React.FC = () => {
   }, [selectedPatient]);
 
   const surgeryReadyPatients = patients.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.mobile.includes(searchTerm);
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.mobile.includes(searchTerm) || p.id.includes(searchTerm);
     const isSurgical = p.doctorAssessment && p.doctorAssessment.quickCode.includes('S1');
-    if (queueFilter === 'PENDING') return isSurgical && p.packageProposal?.status === ProposalStatus.Pending && matchesSearch;
-    if (queueFilter === 'FOLLOWUP') return isSurgical && p.packageProposal?.status === ProposalStatus.FollowUp && matchesSearch;
-    if (queueFilter === 'CONVERT') return isSurgical && p.packageProposal?.status === ProposalStatus.SurgeryFixed && matchesSearch;
+    const currentStatus = p.packageProposal?.status || ProposalStatus.Pending;
+    
+    if (queueFilter === 'PENDING') return isSurgical && currentStatus === ProposalStatus.Pending && matchesSearch;
+    if (queueFilter === 'FOLLOWUP') return isSurgical && currentStatus === ProposalStatus.FollowUp && matchesSearch;
+    if (queueFilter === 'CONVERT') return isSurgical && currentStatus === ProposalStatus.SurgeryFixed && matchesSearch;
     return isSurgical && matchesSearch;
   });
 
@@ -120,17 +122,22 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
 
           <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
-            {['ALL ACTIVE', 'PENDING', 'DUE FOLLOWUPS', 'CONVERT'].map((f) => (
+            {[
+              { id: 'ALL', label: 'ALL ACTIVE' },
+              { id: 'PENDING', label: 'PENDING' },
+              { id: 'FOLLOWUP', label: 'DUE FOLLOWUPS' },
+              { id: 'CONVERT', label: 'CONVERT' }
+            ].map((f) => (
               <button 
-                key={f}
-                onClick={() => setQueueFilter(f.split(' ')[0] as any)}
+                key={f.id}
+                onClick={() => setQueueFilter(f.id as any)}
                 className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
-                  (f === 'ALL ACTIVE' && queueFilter === 'ALL') || f.includes(queueFilter) 
+                  queueFilter === f.id 
                     ? 'bg-hospital-600 text-white' 
                     : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                 }`}
               >
-                {f}
+                {f.label}
               </button>
             ))}
           </div>
@@ -158,11 +165,6 @@ export const PackageTeamDashboard: React.FC = () => {
                 <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md text-[8px] font-black uppercase tracking-widest border border-slate-200">
                   {patient.source || 'DIRECT'}
                 </span>
-                {patient.doctorAssessment?.quickCode.includes('S1') && (
-                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[8px] font-black uppercase tracking-widest border border-indigo-100">
-                    DOCTOR RECOMMENDED
-                  </span>
-                )}
               </div>
             </button>
           ))}
@@ -200,7 +202,7 @@ export const PackageTeamDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              {/* 1. Comprehensive Patient Profile Section */}
+              {/* Comprehensive Profile */}
               <section className="bg-hospital-50/50 rounded-3xl border border-hospital-100 p-8">
                 <div className="flex items-center gap-2 mb-6">
                   <Activity className="w-4 h-4 text-hospital-500" />
@@ -244,9 +246,8 @@ export const PackageTeamDashboard: React.FC = () => {
                 </div>
               </section>
 
-              {/* 2. Interactive Controls Grid */}
+              {/* Strategy & Facilities Selection */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* AI & Strategy */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -269,7 +270,6 @@ export const PackageTeamDashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Facilities Selection */}
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     <BedDouble className="w-3.5 h-3.5 text-emerald-500" /> Facilities Selection
@@ -299,7 +299,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. Package Details & Consumables */}
+              {/* Package Details & Consumables */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div className="space-y-6">
                   <div className="flex items-center gap-2">
