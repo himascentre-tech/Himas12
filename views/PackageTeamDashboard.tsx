@@ -194,10 +194,16 @@ export const PackageTeamDashboard: React.FC = () => {
   const printableRows = useMemo(() => {
     if (!selectedPatient) return [];
     const docAssessment = selectedPatient.doctorAssessment;
+    const insuranceValue = selectedPatient.hasInsurance === 'Yes' 
+      ? (selectedPatient.insuranceName || 'YES (TPA)').toUpperCase()
+      : selectedPatient.hasInsurance.toUpperCase();
+
     return [
       { label: 'PATIENT NAME', value: selectedPatient.name.toUpperCase() },
       { label: 'UHID NO', value: selectedPatient.id, isMono: true },
-      { label: 'REFERRED BY', value: (selectedPatient.sourceDoctorName || selectedPatient.source || 'N/A').toUpperCase() },
+      { label: 'INSURANCE', value: insuranceValue },
+      { label: 'LEAD SOURCE', value: selectedPatient.source.toUpperCase() },
+      { label: 'REFERRED BY', value: (selectedPatient.sourceDoctorName || 'N/A').toUpperCase() },
       { label: 'PROPOSED SURGERY', value: (docAssessment?.surgeryProcedure === SurgeryProcedure.Others ? docAssessment?.otherSurgeryName : docAssessment?.surgeryProcedure)?.toUpperCase() || 'N/A' },
       { label: 'PAYMENT MODE', value: proposal.paymentMode?.toUpperCase() || 'CASH' },
       { label: 'ROOM TYPE', value: proposal.roomType?.toUpperCase() || 'SEMI' },
@@ -337,7 +343,7 @@ export const PackageTeamDashboard: React.FC = () => {
                       <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Patient Readiness</label>
                       <div className="font-bold text-slate-700 text-sm">{selectedPatient.doctorAssessment?.conversionReadiness}</div>
                     </div>
-                    {/* NEW: Insurance Column */}
+                    {/* Insurance Column */}
                     <div>
                       <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block flex items-center gap-1.5"><Shield className="w-3 h-3 text-emerald-500" /> Insurance Status</label>
                       <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
@@ -348,7 +354,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    {/* NEW: Source Column */}
+                    {/* Source Column */}
                     <div>
                       <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block flex items-center gap-1.5"><MapPin className="w-3 h-3 text-blue-500" /> Lead Source</label>
                       <div className="font-bold text-slate-800 text-sm truncate">
