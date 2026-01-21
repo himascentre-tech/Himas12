@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, BookingStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { syncToGoogleSheets } from '../services/googleSheetsService';
+import { cachedFetch, updateCache } from '../utils/cache';
 
 interface HospitalContextType {
   currentUserRole: Role;
@@ -54,6 +54,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const cachedHospitalId = useRef<string | null>(null);
   const pollingInterval = useRef<number | null>(null);
+  const loadRetryCount = useRef(0);
+  const prewarmTimer = useRef<number | null>(null);
 
   const setCurrentUserRole = (role: Role) => {
     if (role) {
@@ -63,11 +65,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       sessionStorage.removeItem(STORAGE_KEY_ROLE);
       cachedHospitalId.current = null;
       setPatients([]);
+      if (prewarmTimer.current) {
+        clearInterval(prewarmTimer.current);
+        prewarmTimer.current = null;
+      }
     }
     _setCurrentUserRole(role);
   };
 
-  const clearError = () => setLastErrorMessage(null);
+  const clearError = () => {
+    setLastErrorMessage(null);
+    loadRetryCount.current = 0;
+  };
+  
   const forceStopLoading = () => setIsLoading(false);
 
   const formatError = useCallback((e: any): string => {
@@ -75,7 +85,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (typeof e === 'string') return e;
     
     if (e.message?.includes('Failed to fetch') || e.message?.includes('connection timeout') || e.message?.includes('Connection terminated')) {
-      return "Cloud sync interrupted (Database Sleep). Retrying automatically...";
+      return "Network Synchronizing (Cloud Handshake)...";
     }
     
     const parts = [];
@@ -87,17 +97,17 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     return String(e);
   }, []);
 
-  // Updated prewarm to use a lightweight RPC if available
   const prewarmDatabase = useCallback(async () => {
-    try {
-      // Try to call the ping function first, falls back to lightweight query
-      const { error } = await supabase.rpc('ping_db');
-      if (error) {
+    if (prewarmTimer.current) return;
+    
+    const pulse = async () => {
+      try {
         await supabase.from('himas_data').select('id', { count: 'exact', head: true }).limit(1);
-      }
-    } catch (e) {
-      // Silent catch
-    }
+      } catch (e) { /* Silent fail */ }
+    };
+
+    pulse(); 
+    prewarmTimer.current = window.setInterval(pulse, 45000); 
   }, []);
 
   const mapPatientFromDB = (item: any): Patient | null => {
@@ -199,48 +209,63 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      const { data, error } = await supabase
-        .from('himas_data')
-        .select('*')
-        .eq('hospital_id', hospitalId);
+      // Use cachedFetch to prevent redundant egress
+      const data = await cachedFetch(
+        `patients_${hospitalId}`,
+        async () => {
+          const { data, error } = await supabase
+            .from('himas_data')
+            .select('*')
+            .eq('hospital_id', hospitalId)
+            .order('entry_date', { ascending: false })
+            .limit(200); // Pagination/Limit added for performance
 
-      if (error) throw error;
+          if (error) throw error;
+          return data;
+        },
+        isBackground ? 45000 : 30000 // Slightly longer TTL for background polls
+      );
       
       const mapped = (data || [])
         .map(mapPatientFromDB)
-        .filter((p): p is Patient => p !== null)
-        .sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
+        .filter((p): p is Patient => p !== null);
 
       setPatients(mapped);
       setSaveStatus('saved');
       setLastSavedAt(new Date());
       setLastErrorMessage(null);
+      loadRetryCount.current = 0;
     } catch (e: any) {
       const msg = formatError(e);
-      if (!isBackground && msg.includes("Retrying")) {
-         setTimeout(() => loadData(), 1200);
+      if (!isBackground && loadRetryCount.current < 5) {
+         loadRetryCount.current++;
+         setTimeout(() => loadData(), 2000);
       } else {
          setLastErrorMessage(msg);
          setSaveStatus('error');
       }
     } finally {
-      if (!isBackground) setIsLoading(false);
+      if (!isBackground && loadRetryCount.current === 0) setIsLoading(false);
     }
   }, [formatError]);
 
   useEffect(() => {
     if (currentUserRole) {
       loadData();
-      pollingInterval.current = window.setInterval(() => loadData(true), 25000);
+      // Reduced frequency to once per minute to save egress
+      pollingInterval.current = window.setInterval(() => loadData(true), 60000);
+      prewarmDatabase();
     } else {
       setIsLoading(false);
     }
-    return () => { if (pollingInterval.current) clearInterval(pollingInterval.current); };
-  }, [currentUserRole, loadData]);
+    return () => { 
+      if (pollingInterval.current) clearInterval(pollingInterval.current); 
+      if (prewarmTimer.current) clearInterval(prewarmTimer.current);
+    };
+  }, [currentUserRole, loadData, prewarmDatabase]);
 
   const updatePatient = async (updatedPatient: Patient, oldId?: string) => {
     setSaveStatus('saving');
-    clearError();
     try {
       const dbPayload = mapPatientToDB(updatedPatient);
       const targetId = oldId || dbPayload.id;
@@ -258,7 +283,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (mapped) {
         setPatients(prev => {
           const filtered = prev.filter(p => p.id !== oldId && p.id !== targetId);
-          return [mapped, ...filtered].sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
+          const newList = [mapped, ...filtered].sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
+          
+          // Update cache with fresh state
+          if (cachedHospitalId.current) {
+            updateCache(`patients_${cachedHospitalId.current}`, newList);
+          }
+          
+          return newList;
         });
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
@@ -276,7 +308,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       currentUserRole, setCurrentUserRole, activeSubTab, setActiveSubTab, patients, updatePatient,
       addPatient: async (pd) => {
         setSaveStatus('saving');
-        clearError();
         try {
           const hospitalId = await getEffectiveHospitalId();
           if (!hospitalId) throw new Error("Not logged in.");
@@ -285,7 +316,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (error) throw error;
           const mapped = mapPatientFromDB(data);
           if (mapped) {
-            setPatients(prev => [mapped, ...prev]);
+            setPatients(prev => {
+              const newList = [mapped, ...prev];
+              updateCache(`patients_${hospitalId}`, newList);
+              return newList;
+            });
             syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
           }
           setSaveStatus('saved');
@@ -301,7 +336,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           const hospitalId = await getEffectiveHospitalId();
           const { error } = await supabase.from('himas_data').delete().eq('id', id).eq('hospital_id', hospitalId);
           if (error) throw error;
-          setPatients(prev => prev.filter(p => p.id !== id));
+          setPatients(prev => {
+            const newList = prev.filter(p => p.id !== id);
+            if (hospitalId) updateCache(`patients_${hospitalId}`, newList);
+            return newList;
+          });
         } catch (err: any) {
           console.error("Delete Error:", formatError(err));
         }

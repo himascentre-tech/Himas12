@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus, Database } from 'lucide-react';
@@ -13,7 +12,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   useEffect(() => {
     let timer: number;
     if (isLoading) {
-      timer = window.setTimeout(() => setShowTroubleshoot(true), 6000);
+      // Increased from 6s to 12s to be more patient with Supabase wake-up
+      timer = window.setTimeout(() => setShowTroubleshoot(true), 12000);
     } else {
       setShowTroubleshoot(false);
       setIsRetrying(false);
@@ -79,36 +79,28 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         
         <div className="text-center space-y-3 mb-10">
           <h2 className="text-slate-800 font-bold text-2xl tracking-tight">
-            {lastErrorMessage ? "Sync Interrupted" : (showTroubleshoot ? "Waking Secure Database..." : "Synchronizing Hospital Data")}
+            {lastErrorMessage ? "Connection Interrupted" : "Resuming Secure Session..."}
           </h2>
           <p className="text-slate-400 text-sm max-w-xs mx-auto">
             {lastErrorMessage 
-              ? "A communication error occurred while fetching records." 
-              : "Connecting to secure clinical database... This may take up to 30 seconds if the system has been inactive."}
+              ? "Re-establishing handshake with the clinical database." 
+              : "Synchronizing your facility records with the secure cloud network."}
           </p>
         </div>
         
-        {lastErrorMessage && (
-          <div className="mb-8 p-5 bg-red-50 border border-red-100 rounded-2xl max-w-md w-full shadow-sm animate-in fade-in zoom-in-95">
-            <div className="flex gap-4">
-              <div className="bg-red-500 p-1.5 rounded-lg h-fit mt-0.5">
-                <AlertCircle className="w-4 h-4 text-white" />
-              </div>
-              <div className="space-y-1">
-                <div className="text-[10px] font-black text-red-400 uppercase tracking-widest">Network Error Trace</div>
-                <div className="text-xs font-bold text-red-700 leading-relaxed break-all">{lastErrorMessage}</div>
-              </div>
-            </div>
-          </div>
+        {lastErrorMessage && !showTroubleshoot && (
+           <div className="flex items-center gap-3 text-hospital-600 font-bold text-xs animate-pulse">
+             <Loader2 className="w-4 h-4 animate-spin" /> Auto-recovering connection...
+           </div>
         )}
 
-        {(showTroubleshoot || lastErrorMessage) && (
+        {showTroubleshoot && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-5 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-xl max-w-md w-full relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-amber-400" />
             
             <div className="flex items-center gap-3 text-amber-700 font-black text-xs uppercase tracking-widest">
               <Database className="w-4 h-4" /> 
-              {lastErrorMessage ? "Connection Refused" : "Cold Start Detected"}
+              Initial Cloud Sync Taking Longer
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 w-full">
@@ -124,13 +116,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                  onClick={forceStopLoading} 
                  className="flex-1 bg-hospital-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all"
                >
-                 Enter Offline
+                 Go Offline
                </button>
             </div>
             
             <div className="p-3 bg-white/50 rounded-xl border border-white text-[10px] text-slate-500 text-center leading-relaxed">
-              <span className="font-bold block mb-1">PRO TIP</span>
-              Free database instances enter "Hibernation" during inactivity. Manual retry triggers an immediate wake signal.
+              <span className="font-bold block mb-1">NETWORK NOTE</span>
+              Cloud instances hibernate during inactivity to save energy. A retry will trigger an immediate high-priority wake signal.
             </div>
           </div>
         )}
