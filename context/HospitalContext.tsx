@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, BookingStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -209,7 +210,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      // Use cachedFetch to prevent redundant egress
       const data = await cachedFetch(
         `patients_${hospitalId}`,
         async () => {
@@ -218,12 +218,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             .select('*')
             .eq('hospital_id', hospitalId)
             .order('entry_date', { ascending: false })
-            .limit(200); // Pagination/Limit added for performance
+            .limit(200); 
 
           if (error) throw error;
           return data;
         },
-        isBackground ? 45000 : 30000 // Slightly longer TTL for background polls
+        isBackground ? 45000 : 30000 
       );
       
       const mapped = (data || [])
@@ -252,7 +252,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (currentUserRole) {
       loadData();
-      // Reduced frequency to once per minute to save egress
       pollingInterval.current = window.setInterval(() => loadData(true), 60000);
       prewarmDatabase();
     } else {
@@ -281,17 +280,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const mapped = mapPatientFromDB(data);
       if (mapped) {
+        let finalPatientsList: Patient[] = [];
         setPatients(prev => {
           const filtered = prev.filter(p => p.id !== oldId && p.id !== targetId);
-          const newList = [mapped, ...filtered].sort((a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime());
-          
-          // Update cache with fresh state
-          if (cachedHospitalId.current) {
-            updateCache(`patients_${cachedHospitalId.current}`, newList);
-          }
-          
-          return newList;
+          finalPatientsList = [mapped, ...filtered].sort((a, b) => 
+            new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime()
+          );
+          return finalPatientsList;
         });
+        
+        // Side effects after state is calculated
+        if (cachedHospitalId.current) {
+          updateCache(`patients_${cachedHospitalId.current}`, finalPatientsList);
+        }
         syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
       }
       setSaveStatus('saved');
@@ -316,11 +317,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (error) throw error;
           const mapped = mapPatientFromDB(data);
           if (mapped) {
+            let finalPatientsList: Patient[] = [];
             setPatients(prev => {
-              const newList = [mapped, ...prev];
-              updateCache(`patients_${hospitalId}`, newList);
-              return newList;
+              finalPatientsList = [mapped, ...prev];
+              return finalPatientsList;
             });
+            updateCache(`patients_${hospitalId}`, finalPatientsList);
             syncToGoogleSheets(mapped).catch(e => console.error("Sheets Sync Error:", e));
           }
           setSaveStatus('saved');

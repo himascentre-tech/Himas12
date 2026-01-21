@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
+import { TestUpload } from '../components/TestUpload';
 import { Gender, Condition, Patient, ProposalStatus, BookingStatus } from '../types';
 import { syncToGoogleSheets } from '../services/googleSheetsService';
 import { 
@@ -11,7 +12,8 @@ import {
   Stethoscope, Users, History, Timer, ArrowRight,
   Filter, ChevronLeft, ChevronRight as ChevronRightIcon,
   Globe, UserPlus, ShieldCheck, Shield, BookmarkPlus, CalendarCheck,
-  UserCheck, RotateCcw, FileSpreadsheet, Download, Share2, ExternalLink
+  UserCheck, RotateCcw, FileSpreadsheet, Download, Share2, ExternalLink,
+  Undo2
 } from 'lucide-react';
 
 type TabType = 'NEW' | 'HISTORY' | 'OLD' | 'BOOKING';
@@ -93,10 +95,10 @@ export const FrontOfficeDashboard: React.FC = () => {
     const list: Array<{ patient: Patient; arrivalTime: string; type: 'NEW' | 'OLD' }> = [];
     
     patients.forEach(p => {
+      if (!p) return;
+      
       const isRegistered = !p.bookingStatus;
-      const isArrived = p.bookingStatus === BookingStatus.Arrived;
-
-      if (!isRegistered && !isArrived) return; 
+      if (!isRegistered) return; 
 
       if (p.entry_date === filterDate) {
         let timeDisplay = '--:--';
@@ -118,7 +120,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         });
       }
       
-      if (p.lastFollowUpVisitDate?.startsWith(filterDate)) {
+      if (p.lastFollowUpVisitDate && p.lastFollowUpVisitDate.startsWith(filterDate)) {
          const parts = p.lastFollowUpVisitDate.split(' ');
          const timePart = parts.length > 1 ? parts[1] : '--:--';
          list.push({
@@ -129,15 +131,15 @@ export const FrontOfficeDashboard: React.FC = () => {
       }
     });
 
-    return list.sort((a, b) => b.arrivalTime.localeCompare(a.arrivalTime));
+    return list.sort((a, b) => (b.arrivalTime || '').localeCompare(a.arrivalTime || ''));
   }, [patients, selectedHistoryDate]);
 
   const bookingList = useMemo(() => {
-    return patients.filter(p => !!p.bookingStatus)
+    return patients.filter(p => !!p && !!p.bookingStatus)
       .filter(p => {
         const matchesSearch = !searchTerm.trim() || 
-          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-          p.mobile.includes(searchTerm);
+          (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+          (p.mobile || '').includes(searchTerm);
         
         const matchesDate = !selectedBookingDate || p.entry_date === selectedBookingDate;
         
@@ -146,15 +148,15 @@ export const FrontOfficeDashboard: React.FC = () => {
       .sort((a, b) => {
         if (a.bookingStatus === BookingStatus.Arrived && b.bookingStatus !== BookingStatus.Arrived) return -1;
         if (a.bookingStatus !== BookingStatus.Arrived && b.bookingStatus === BookingStatus.Arrived) return 1;
-        return b.entry_date.localeCompare(a.entry_date);
+        return (b.entry_date || '').localeCompare(a.entry_date || '');
       });
   }, [patients, searchTerm, selectedBookingDate]);
 
   const getFilteredBookings = () => {
-    let filtered = patients.filter(p => !!p.bookingStatus);
+    let filtered = patients.filter(p => !!p && !!p.bookingStatus);
 
-    if (bookingReportStart) filtered = filtered.filter(p => p.entry_date >= bookingReportStart);
-    if (bookingReportEnd) filtered = filtered.filter(p => p.entry_date <= bookingReportEnd);
+    if (bookingReportStart) filtered = filtered.filter(p => (p.entry_date || '') >= bookingReportStart);
+    if (bookingReportEnd) filtered = filtered.filter(p => (p.entry_date || '') <= bookingReportEnd);
     if (bookingStatusFilter !== 'ALL') filtered = filtered.filter(p => p.bookingStatus === bookingStatusFilter);
     if (bookingSourceFilter !== 'ALL') filtered = filtered.filter(p => p.source === bookingSourceFilter);
 
@@ -176,7 +178,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       p.bookingStatus
     ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
 
-    // Adding UTF-8 BOM to ensure Excel opens it correctly as an editable spreadsheet
     const BOM = '\uFEFF';
     const csvContent = BOM + [headers.join(','), ...rows].join('\n');
     
@@ -198,13 +199,12 @@ export const FrontOfficeDashboard: React.FC = () => {
       return;
     }
 
-    if (!confirm(`Sync ${filtered.length} filtered bookings to Google Sheets? This will update the online spreadsheet.`)) return;
+    if (!confirm(`Sync ${filtered.length} filtered bookings to Google Sheets?`)) return;
 
     setIsBulkSyncing(true);
     let successCount = 0;
     
     try {
-      // Loop through filtered data and sync each to Google Sheets
       for (const patient of filtered) {
         const success = await syncToGoogleSheets(patient);
         if (success) successCount++;
@@ -252,14 +252,22 @@ export const FrontOfficeDashboard: React.FC = () => {
     setStep(2);
   };
 
+  const resetForm = () => {
+    setFormData(getInitialFormData());
+    setOtherSourceDetail('');
+    setEditingId(null);
+    setStep(1);
+    setLocalError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
 
-    const finalId = formData.id?.trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
+    const finalId = (formData.id || '').trim().toUpperCase() || `AUTO-${Date.now().toString().slice(-6)}`;
 
-    if (!editingId && patients.some(p => p.id.toLowerCase() === finalId.toLowerCase())) {
+    if (!editingId && patients.some(p => (p.id || '').toLowerCase() === finalId.toLowerCase())) {
       setLocalError(`Patient File ID "${finalId}" is already registered.`);
       return;
     }
@@ -272,7 +280,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         ...formData, 
         source: finalSource, 
         id: finalId,
-        bookingStatus: null,
+        bookingStatus: null, 
         arrivalTime: formData.arrivalTime || getCurrentTime()
       };
 
@@ -287,6 +295,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         await addPatient(submissionData as any);
       }
       
+      setActiveSubTab('DASHBOARD');
       setShowForm(false);
       resetForm();
       setActiveTab('HISTORY');
@@ -371,7 +380,7 @@ export const FrontOfficeDashboard: React.FC = () => {
         });
       }
 
-      let baseSource = patient.source;
+      let baseSource = patient.source || 'Google';
       let detail = '';
       if (patient.source && patient.source.startsWith('Other: ')) {
         baseSource = 'Other';
@@ -400,6 +409,26 @@ export const FrontOfficeDashboard: React.FC = () => {
     }
   };
 
+  const handleRevertToBooking = async (patient: Patient) => {
+    if (!confirm(`Move ${patient.name} back to Scheduled Bookings?`)) return;
+    
+    setIsSubmitting(true);
+    try {
+      await updatePatient({ 
+        ...patient, 
+        bookingStatus: BookingStatus.OPDFix, 
+        arrivalTime: null,
+        doctorAssessment: null 
+      });
+      setActiveSubTab('BOOKING');
+      setActiveTab('BOOKING');
+    } catch (err: any) {
+      alert("Failed to revert: " + formatError(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleRevisitSubmit = async () => {
     if (!revisitPatient) return;
     setIsSubmitting(true);
@@ -425,16 +454,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     }
   };
 
-  const resetForm = () => {
-    setFormData(getInitialFormData());
-    setOtherSourceDetail('');
-    setEditingId(null);
-    setStep(1);
-    setLocalError(null);
-  };
-
   const handleEdit = (p: Patient) => {
-    let baseSource = p.source;
+    let baseSource = p.source || 'Google';
     let detail = '';
     if (p.source && p.source.startsWith('Other: ')) {
       baseSource = 'Other';
@@ -459,13 +480,15 @@ export const FrontOfficeDashboard: React.FC = () => {
   ];
 
   const filteredArchive = useMemo(() => {
-    if (!searchTerm.trim()) return patients.filter(p => !p.bookingStatus);
+    const list = patients.filter(p => !!p && !p.bookingStatus);
+    if (!searchTerm.trim()) return list;
+    
     const searchLower = searchTerm.toLowerCase();
     const cleanSearchDigits = searchTerm.replace(/\D/g, '');
-    return patients.filter(p => !p.bookingStatus).filter(p => 
-      p.name.toLowerCase().includes(searchLower) || 
-      p.id.toLowerCase().includes(searchLower) ||
-      (cleanSearchDigits && p.mobile.includes(cleanSearchDigits))
+    return list.filter(p => 
+      (p.name || '').toLowerCase().includes(searchLower) || 
+      (p.id || '').toLowerCase().includes(searchLower) ||
+      (cleanSearchDigits && (p.mobile || '').includes(cleanSearchDigits))
     );
   }, [patients, searchTerm]);
 
@@ -554,6 +577,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <th className="px-6 py-4">Condition</th>
                   <th className="px-6 py-4">Lead Source</th>
                   <th className="px-6 py-4 text-center">Visit Classification</th>
+                  <th className="px-6 py-4 text-center no-print">Manage</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -584,11 +608,23 @@ export const FrontOfficeDashboard: React.FC = () => {
                         {entry.type === 'NEW' ? 'New Registration' : 'Return Revisit'}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-center no-print">
+                      <div className="flex items-center justify-center gap-2">
+                         <button 
+                           onClick={() => handleRevertToBooking(entry.patient)}
+                           className="p-2 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                           title="Revert to Booking Status"
+                         >
+                           <Undo2 className="w-4 h-4" />
+                         </button>
+                         <button onClick={() => handleEdit(entry.patient)} className="p-2 text-slate-300 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"><Pencil className="w-4 h-4" /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {historyOPDList.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">No activity recorded for this date.</td>
+                    <td colSpan={7} className="px-6 py-20 text-center text-slate-400 italic font-medium">No activity recorded for this date.</td>
                   </tr>
                 )}
               </tbody>
@@ -750,37 +786,47 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
-                  <tr>
-                    <th className="px-6 py-4">File ID</th>
-                    <th className="px-6 py-4">Patient Profile</th>
-                    <th className="px-6 py-4">Original DOP</th>
-                    <th className="px-6 py-4">Contact</th>
-                    <th className="px-6 py-4 text-center">Lifecycle Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredArchive.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50/30 transition-colors group">
-                      <td className="px-6 py-4"><span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2.5 py-1.5 rounded-lg border border-hospital-100">{p.id}</span></td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900 group-hover:text-hospital-700 transition-colors">{p.name}</div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                           <span className="text-[10px] text-slate-400 font-medium">{p.age}y • {p.gender}</span>
-                           <span className="w-1 h-1 rounded-full bg-slate-200" />
-                           <span className="text-[10px] text-hospital-500 font-bold">{p.condition}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Calendar className="w-3.5 h-3.5 text-hospital-500" />{p.entry_date}</div></td>
-                      <td className="px-6 py-4"><div className="flex items-center gap-2 text-sm font-mono font-bold text-slate-700"><Phone className="w-3.5 h-3.5 text-hospital-500" />{p.mobile}</div></td>
-                      <td className="px-6 py-4"><div className="flex items-center justify-center gap-3"><button onClick={() => { setRevisitPatient(p); setRevisitData({ date: getTodayDate(), time: getCurrentTime() }); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"><History className="w-3.5 h-3.5" /> Log Revisit</button><button onClick={() => handleEdit(p)} className="p-2 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"><Pencil className="w-4 h-4" /></button></div></td>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                    <tr>
+                      <th className="px-6 py-4">File ID</th>
+                      <th className="px-6 py-4">Patient Profile</th>
+                      <th className="px-6 py-4">Original DOP</th>
+                      <th className="px-6 py-4">Contact</th>
+                      <th className="px-6 py-4 text-center">Lifecycle Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredArchive.map(p => (
+                      <tr key={p.id} className="hover:bg-slate-50/30 transition-colors group">
+                        <td className="px-6 py-4"><span className="font-mono text-xs font-bold text-hospital-600 bg-hospital-50 px-2.5 py-1.5 rounded-lg border border-hospital-100">{p.id}</span></td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900 group-hover:text-hospital-700 transition-colors">{p.name}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                             <span className="text-[10px] text-slate-400 font-medium">{p.age}y • {p.gender}</span>
+                             <span className="w-1 h-1 rounded-full bg-slate-200" />
+                             <span className="text-[10px] text-hospital-500 font-bold">{p.condition}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"><div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Calendar className="w-3.5 h-3.5 text-hospital-500" />{p.entry_date}</div></td>
+                        <td className="px-6 py-4"><div className="flex items-center gap-2 text-sm font-mono font-bold text-slate-700"><Phone className="w-3.5 h-3.5 text-hospital-500" />{p.mobile}</div></td>
+                        <td className="px-6 py-4"><div className="flex items-center justify-center gap-3"><button onClick={() => { setRevisitPatient(p); setRevisitData({ date: getTodayDate(), time: getCurrentTime() }); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl font-bold text-[10px] border border-amber-100 hover:bg-amber-100 transition-all shadow-sm active:scale-95"><History className="w-3.5 h-3.5" /> Log Revisit</button><button onClick={() => handleEdit(p)} className="p-2 text-slate-400 hover:text-hospital-600 hover:bg-hospital-50 rounded-xl transition-all"><Pencil className="w-4 h-4" /></button></div></td>
+                      </tr>
+                    ))}
+                    {filteredArchive.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic font-medium">No records found matching search criteria.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="lg:col-span-1">
+              <TestUpload />
             </div>
           </div>
         </div>
