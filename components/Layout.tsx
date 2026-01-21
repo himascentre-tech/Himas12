@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BookmarkPlus, Database } from 'lucide-react';
@@ -12,7 +13,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   useEffect(() => {
     let timer: number;
     if (isLoading) {
-      // Increased from 6s to 12s to be more patient with Supabase wake-up
       timer = window.setTimeout(() => setShowTroubleshoot(true), 12000);
     } else {
       setShowTroubleshoot(false);
@@ -71,7 +71,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-white p-6">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-white p-6 z-[9999]">
         <div className="relative mb-10">
           <div className="w-24 h-24 border-4 border-slate-100 border-t-hospital-600 rounded-full animate-spin"></div>
           <Activity className="absolute inset-0 m-auto w-10 h-10 text-hospital-600 animate-pulse" />
@@ -87,42 +87,17 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               : "Synchronizing your facility records with the secure cloud network."}
           </p>
         </div>
-        
-        {lastErrorMessage && !showTroubleshoot && (
-           <div className="flex items-center gap-3 text-hospital-600 font-bold text-xs animate-pulse">
-             <Loader2 className="w-4 h-4 animate-spin" /> Auto-recovering connection...
-           </div>
-        )}
 
         {showTroubleshoot && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center gap-5 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-xl max-w-md w-full relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-amber-400" />
-            
-            <div className="flex items-center gap-3 text-amber-700 font-black text-xs uppercase tracking-widest">
-              <Database className="w-4 h-4" /> 
-              Initial Cloud Sync Taking Longer
-            </div>
-            
             <div className="flex flex-col sm:flex-row gap-3 w-full">
-               <button 
-                 onClick={handleRetry} 
-                 disabled={isRetrying}
-                 className="flex-1 bg-white text-slate-700 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50"
-               >
-                 {isRetrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                 Retry Sync
+               <button onClick={handleRetry} disabled={isRetrying} className="flex-1 bg-white text-slate-700 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all shadow-sm">
+                 {isRetrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Retry Sync
                </button>
-               <button 
-                 onClick={forceStopLoading} 
-                 className="flex-1 bg-hospital-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all"
-               >
+               <button onClick={forceStopLoading} className="flex-1 bg-hospital-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-hospital-700 shadow-lg shadow-hospital-100 transition-all">
                  Go Offline
                </button>
-            </div>
-            
-            <div className="p-3 bg-white/50 rounded-xl border border-white text-[10px] text-slate-500 text-center leading-relaxed">
-              <span className="font-bold block mb-1">NETWORK NOTE</span>
-              Cloud instances hibernate during inactivity to save energy. A retry will trigger an immediate high-priority wake signal.
             </div>
           </div>
         )}
@@ -131,8 +106,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-20 no-print">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row relative">
+      <div className="md:hidden bg-white border-b p-4 flex justify-between items-center shadow-sm z-[100] no-print">
         <div className="font-bold text-hospital-600 tracking-tighter text-xl">HiMAS</div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-slate-100 rounded-lg">
           {isSidebarOpen ? <X /> : <Menu />}
@@ -140,7 +115,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </div>
 
       <aside className={`
-        fixed inset-y-0 left-0 z-10 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out no-print
+        fixed inset-y-0 left-0 z-[110] w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out no-print
         md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -170,15 +145,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             >
               <FileText className="w-5 h-5" /> Dashboard
             </button>
-            
-            {currentUserRole === 'FRONT_OFFICE' && (
-              <button 
-                onClick={() => { setActiveSubTab('BOOKING'); setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeSubTab === 'BOOKING' ? 'bg-hospital-600 text-white shadow-lg shadow-hospital-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-              >
-                <BookmarkPlus className="w-5 h-5" /> Scheduled Booking
-              </button>
-            )}
           </nav>
 
           <div className="pt-6 border-t border-slate-800">
@@ -189,14 +155,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto h-screen relative bg-[#f8fafc]">
+      <main className="flex-1 overflow-auto h-screen relative bg-[#f8fafc] z-[1]">
         <div className="p-4 md:p-10 max-w-[1600px]">
           {children}
         </div>
       </main>
       
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-0 md:hidden no-print" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[105] md:hidden no-print" onClick={() => setIsSidebarOpen(false)} />
       )}
     </div>
   );

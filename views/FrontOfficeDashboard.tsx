@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, Gender, Condition, BookingStatus } from '../types';
@@ -16,7 +16,6 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
-  // Registration Form State
   const [form, setForm] = useState<Partial<Patient>>({
     name: '',
     age: 0,
@@ -33,10 +32,9 @@ export const FrontOfficeDashboard: React.FC = () => {
     refreshData();
   }, [refreshData]);
 
-  // Sync form when selection changes
   useEffect(() => {
     if (selectedPatient) {
-      setForm(selectedPatient);
+      setForm({ ...selectedPatient });
     } else {
       setForm({
         name: '',
@@ -51,6 +49,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       });
     }
   }, [selectedPatient]);
+
+  const handlePatientSelect = useCallback((p: Patient) => {
+    setSelectedPatient(p);
+  }, []);
 
   const filteredQueue = patients.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -83,7 +85,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   return (
     <div className="flex h-[calc(100vh-80px)] gap-6 overflow-hidden">
       {/* Sidebar: Registration Queue */}
-      <div className="w-80 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden no-print">
+      <div className="w-80 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden no-print z-[10]">
         <div className="p-5 border-b border-slate-100 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -92,7 +94,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
             <button 
               onClick={() => setSelectedPatient(null)}
-              className="p-1.5 hover:bg-hospital-50 rounded-lg text-hospital-600 transition-all"
+              className="p-1.5 hover:bg-hospital-50 rounded-lg text-hospital-600 transition-all cursor-pointer"
               title="New Registration"
             >
               <PlusCircle className="w-4 h-4" />
@@ -100,7 +102,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           </div>
           
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 pointer-events-none" />
             <input 
               type="text"
               placeholder="Search patients..."
@@ -115,19 +117,19 @@ export const FrontOfficeDashboard: React.FC = () => {
           {filteredQueue.map(p => (
             <button 
               key={p.id}
-              onClick={() => setSelectedPatient(p)}
-              className={`w-full p-5 text-left transition-all relative group ${selectedPatient?.id === p.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
+              onClick={() => handlePatientSelect(p)}
+              className={`w-full p-5 text-left transition-all relative group cursor-pointer pointer-events-auto ${selectedPatient?.id === p.id ? 'bg-hospital-50/50' : 'hover:bg-slate-50'}`}
             >
               {selectedPatient?.id === p.id && <div className="absolute inset-y-0 left-0 w-1 bg-hospital-600" />}
               <div className="flex justify-between items-start mb-1">
-                <div className="font-bold text-slate-800 text-[11px] tracking-tight uppercase">{p.name}</div>
-                <div className="text-[8px] font-black text-slate-300">{p.id.slice(-6)}</div>
+                <div className="font-bold text-slate-800 text-[11px] tracking-tight uppercase pointer-events-none">{p.name}</div>
+                <div className="text-[8px] font-black text-slate-300 pointer-events-none">{p.id.slice(-6)}</div>
               </div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 pointer-events-none">
                 <span className="text-[9px] font-bold text-slate-400">{p.age}y / {p.gender.charAt(0)}</span>
                 <span className="text-[9px] font-black text-hospital-500 uppercase tracking-widest">{p.condition}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-slate-400 text-[9px] font-medium">
+              <div className="flex items-center gap-1.5 text-slate-400 text-[9px] font-medium pointer-events-none">
                 <Phone className="w-2.5 h-2.5" /> {p.mobile}
               </div>
             </button>
@@ -136,7 +138,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       </div>
 
       {/* Main Content: Registration Workstation */}
-      <div className="flex-1 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
+      <div className="flex-1 flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative z-[5]">
         <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between no-print">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-hospital-50 rounded-xl flex items-center justify-center text-hospital-600">
@@ -154,7 +156,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             {selectedPatient && (
               <button 
                 onClick={() => handleDelete(selectedPatient.id)}
-                className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all"
+                className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -163,7 +165,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-          {/* Basic Identity */}
           <section className="space-y-6">
             <div className="flex items-center gap-2">
               <Fingerprint className="w-4 h-4 text-hospital-500" />
@@ -175,7 +176,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <input 
                   type="text" 
                   className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:border-hospital-500 outline-none transition-all"
-                  value={form.name}
+                  value={form.name || ''}
                   onChange={e => setForm({...form, name: e.target.value})}
                   placeholder="Patient Name"
                 />
@@ -203,7 +204,6 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
           </section>
 
-          {/* Contact & Professional */}
           <section className="space-y-6">
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-indigo-500" />
@@ -215,7 +215,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <input 
                   type="tel" 
                   className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:border-hospital-500 outline-none transition-all"
-                  value={form.mobile}
+                  value={form.mobile || ''}
                   onChange={e => setForm({...form, mobile: e.target.value})}
                   placeholder="10-digit number"
                 />
@@ -225,7 +225,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <input 
                   type="text" 
                   className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:border-hospital-500 outline-none transition-all"
-                  value={form.occupation}
+                  value={form.occupation || ''}
                   onChange={e => setForm({...form, occupation: e.target.value})}
                   placeholder="e.g. Teacher, Engineer"
                 />
@@ -233,7 +233,6 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
           </section>
 
-          {/* Clinical Context */}
           <section className="space-y-6">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-500" />
@@ -285,14 +284,14 @@ export const FrontOfficeDashboard: React.FC = () => {
         <div className="p-8 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
           <button 
             onClick={() => setSelectedPatient(null)}
-            className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-all flex items-center gap-2"
+            className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-all flex items-center gap-2 cursor-pointer"
           >
             <X className="w-3.5 h-3.5" /> Reset Intake Form
           </button>
           <button 
             onClick={handleSave}
             disabled={isSaving || !form.name || !form.mobile}
-            className="flex items-center gap-3 px-12 py-4 bg-hospital-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-hospital-700 transition-all shadow-xl shadow-hospital-100 active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-3 px-12 py-4 bg-hospital-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-hospital-700 transition-all shadow-xl shadow-hospital-100 active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             {selectedPatient ? 'Update Patient Profile' : 'Complete Registration'}

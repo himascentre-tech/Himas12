@@ -37,7 +37,6 @@ const HospitalContext = createContext<HospitalContextType | undefined>(undefined
 const STORAGE_KEY_ROLE = 'himas_hospital_role_session';
 const SHARED_FACILITY_ID = 'himas_main_facility_2024';
 
-// Optimization: Explicitly define fields to avoid SELECT * (Rule 1)
 const PATIENT_FIELDS = `
   id,
   hospital_id,
@@ -82,7 +81,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   
   const cachedHospitalId = useRef<string | null>(null);
-  const pollingInterval = useRef<number | null>(null);
 
   const formatError = useCallback((e: any): string => {
     if (!e) return "Unknown error occurred";
@@ -92,6 +90,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const mapPatientFromDB = (item: any): Patient | null => {
     if (!item) return null;
+    
+    // Ensure nested objects are handled correctly if they come back as empty strings/objects
+    const doctorAssessment = (item.doctor_assessment && Object.keys(item.doctor_assessment).length > 0) 
+      ? (item.doctor_assessment as DoctorAssessment) 
+      : null;
+    const packageProposal = (item.package_proposal && Object.keys(item.package_proposal).length > 0) 
+      ? (item.package_proposal as PackageProposal) 
+      : null;
+
     return {
       id: item.id,
       hospital_id: item.hospital_id,
@@ -108,8 +115,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       sourceDoctorName: item.source_doctor_name || '',
       condition: item.condition || 'Other',
       created_at: item.created_at,
-      doctorAssessment: item.doctor_assessment as DoctorAssessment || null,
-      packageProposal: item.package_proposal || null,
+      doctorAssessment,
+      packageProposal,
       isFollowUpVisit: Boolean(item.is_follow_up),
       lastFollowUpVisitDate: item.last_follow_up_visit_date || null,
       bookingStatus: (item.booking_status === '' || item.booking_status === null) ? null : (item.booking_status as BookingStatus),
@@ -138,7 +145,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const cacheKey = `patients_${hospitalId}`;
       if (force) invalidateCache(cacheKey);
 
-      // Rule 3: Range-based pagination (0-49) to keep data size consistent
       const data = await cachedFetch(
         cacheKey,
         async () => {
@@ -147,11 +153,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             .select(PATIENT_FIELDS)
             .eq('hospital_id', hospitalId)
             .order('entry_date', { ascending: false })
-            .range(0, 49);
+            .range(0, 99); // Increased range for better dashboard visibility
           if (error) throw error;
           return data;
         },
-        force ? 0 : (isBackground ? 45000 : 30000)
+        force ? 0 : (isBackground ? 60000 : 30000)
       );
       
       const mapped = (data || []).map(mapPatientFromDB).filter((p): p is Patient => p !== null);
@@ -175,13 +181,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const hospitalId = await getEffectiveHospitalId();
       if (!hospitalId) return;
-      // Rule 1 & 3: Specific fields + Limit for fast search results
       const { data, error } = await supabase
         .from('himas_data')
         .select(PATIENT_FIELDS)
         .eq('hospital_id', hospitalId)
         .or(`name.ilike.%${term}%,mobile.ilike.%${term}%,id.ilike.%${term}%`)
-        .limit(30);
+        .limit(50);
       if (error) throw error;
       setPatients((data || []).map(mapPatientFromDB).filter((p): p is Patient => p !== null));
     } catch (e: any) {
@@ -225,7 +230,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const mapped = mapPatientFromDB(data);
       if (mapped) {
         setPatients(prev => [mapped, ...prev.filter(p => p.id !== (oldId || updatedPatient.id))]);
-        updateCache(`patients_${cachedHospitalId.current}`, null); // Invalidate cache
+        invalidateCache(`patients_${cachedHospitalId.current}`);
         syncToGoogleSheets(mapped).catch(() => {});
       }
       setSaveStatus('saved');
@@ -260,6 +265,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         const mapped = mapPatientFromDB(data);
         if (mapped) {
           setPatients(prev => [mapped, ...prev]);
+          invalidateCache(`patients_${cachedHospitalId.current}`);
           syncToGoogleSheets(mapped).catch(() => {});
         }
         setSaveStatus('saved');
@@ -267,6 +273,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       deletePatient: async (id) => {
         await supabase.from('himas_data').delete().eq('id', id);
         setPatients(prev => prev.filter(p => p.id !== id));
+        invalidateCache(`patients_${cachedHospitalId.current}`);
       },
       updateDoctorAssessment: async (pid, ass) => {
         const p = patients.find(pat => pat.id === pid);
